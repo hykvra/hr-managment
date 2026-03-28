@@ -1,5 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
+
+const s3 = new S3Client({
+  endpoint: process.env.RAILWAY_STORAGE_ENDPOINT!,
+  region: process.env.RAILWAY_STORAGE_REGION || 'auto',
+  credentials: {
+    accessKeyId: process.env.RAILWAY_STORAGE_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.RAILWAY_STORAGE_SECRET_ACCESS_KEY!,
+  },
+  forcePathStyle: true,
+})
+
+const BUCKET = process.env.RAILWAY_STORAGE_BUCKET!
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,28 +31,22 @@ export async function POST(req: NextRequest) {
     }
 
     const ext = file.name.split('.').pop() || 'jpg'
-    const fileName = `photos/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+    const key = `photos/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
 
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 
-    const { data, error } = await supabaseAdmin.storage
-      .from('employee-documents')
-      .upload(fileName, buffer, {
-        contentType: file.type,
-        upsert: false,
-      })
+    await s3.send(new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: key,
+      Body: buffer,
+      ContentType: file.type,
+    }))
 
-    if (error || !data) {
-      console.error('Storage upload error:', error)
-      return NextResponse.json({ error: 'Upload failed. Please try again.' }, { status: 500 })
-    }
+    const endpoint = process.env.RAILWAY_STORAGE_ENDPOINT!.replace(/\/$/, '')
+    const publicUrl = `${endpoint}/${BUCKET}/${key}`
 
-    const { data: urlData } = supabaseAdmin.storage
-      .from('employee-documents')
-      .getPublicUrl(data.path)
-
-    return NextResponse.json({ url: urlData.publicUrl })
+    return NextResponse.json({ url: publicUrl })
   } catch (err) {
     console.error('Photo upload error:', err)
     return NextResponse.json({ error: 'Upload failed. Please try again.' }, { status: 500 })
