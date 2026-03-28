@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import bcrypt from 'bcryptjs'
+import bcryptjs from 'bcryptjs'
+// bcryptjs v3 compatibility: may ship as ESM with no default export
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const bcrypt = (bcryptjs as any).default ?? bcryptjs
 import { supabaseAdmin } from '@/lib/supabase'
 import { sendWelcomeEmail } from '@/lib/mailer'
 
@@ -84,7 +87,10 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       console.error('Register insert error:', error)
-      return NextResponse.json({ error: 'Registration failed. Please try again.' }, { status: 500 })
+      const msg = process.env.NODE_ENV === 'development'
+        ? `DB error: ${error.message} [${error.code}]`
+        : 'Registration failed. Please try again.'
+      return NextResponse.json({ error: msg }, { status: 500 })
     }
 
     // Send welcome email (non-blocking)

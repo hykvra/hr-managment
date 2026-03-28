@@ -5,10 +5,11 @@ let _supabaseAdmin: SupabaseClient | null = null
 
 export function getSupabase(): SupabaseClient {
   if (!_supabase) {
-    _supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
+    const anonKey =
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ||
+      ''
+    _supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, anonKey)
   }
   return _supabase
 }
