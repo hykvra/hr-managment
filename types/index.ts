@@ -118,3 +118,21 @@ export interface OTPStore {
   otp: string
   expires_at: number
 }
+
+export interface SalaryHistoryRecord {
+  id: string
+  employee_id: string
+  old_salary: number
+  new_salary: number
+  start_month: string
+  created_at: string
+}
+
+export interface BonusHistoryRecord {
+  id: string
+  employee_id: string
+  amount: number
+  reason: string
+  bonus_month: string
+  created_at: string
+}
