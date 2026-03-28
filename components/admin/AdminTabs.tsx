@@ -89,9 +89,9 @@ export function AdminTabs({
 
   const visibleTabs = TAB_CONFIG.filter(t => {
     if (isMaster) return true
-    if (t.masterOnly) return false
-    if (t.alwaysManager) return true
-    if (t.perm && permissions) return permissions[t.perm as keyof typeof permissions]
+    if ('masterOnly' in t) return false
+    if ('alwaysManager' in t) return true
+    if ('perm' in t && t.perm && permissions) return permissions[t.perm as keyof typeof permissions]
     return false
   })
 
