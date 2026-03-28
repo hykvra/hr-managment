@@ -3,77 +3,83 @@ import { getSession } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { AdminTabs } from '@/components/admin/AdminTabs'
 import { Users, CalendarCheck, Banknote, Ticket } from 'lucide-react'
 
 export default async function AdminDashboard() {
   const session = await getSession()
   if (!session) redirect('/login')
 
-  const allowedRoles = ['master_admin', 'manager', 'attendance']
-  if (!allowedRoles.includes(session.role)) redirect('/dashboard')
+  const allowedRoles = ['master_admin', 'manager']
+  if (!allowedRoles.includes(session.role)) {
+    if (session.role === 'attendance') redirect('/admin/attendance')
+    redirect('/dashboard')
+  }
 
-  // Pending counts
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+
   const [
-    { count: pendingLeaves },
-    { count: pendingAdvances },
-    { count: openTickets },
-    { count: pendingRegistrations },
+    { data: pendingEmployees },
+    { data: pendingLeaves },
+    { data: pendingAdvances },
+    { data: recentApprovedAdvances },
+    { data: openTickets },
+    { data: shifts },
+    { data: recentBroadcasts },
+    { data: companySettings },
+    { data: managers },
+    { data: currentPermissions },
+    { count: pendingLeaveCount },
+    { count: pendingAdvanceCount },
+    { count: openTicketCount },
+    { count: pendingRegCount },
   ] = await Promise.all([
-    supabaseAdmin
-      .from('leave_requests')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'pending'),
-    supabaseAdmin
-      .from('salary_advances')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'pending'),
-    supabaseAdmin
-      .from('support_tickets')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'open'),
-    supabaseAdmin
-      .from('employees')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_active', false),
+    supabaseAdmin.from('employees').select('id, first_name, last_name, email, mobile, dob, gender, profile_photo, created_at')
+      .eq('is_active', false).order('created_at', { ascending: false }),
+    supabaseAdmin.from('leave_requests')
+      .select('id, leave_date, end_date, leave_type, exception_flag, created_at, employees!employee_id(first_name, last_name, employee_code)')
+      .eq('status', 'pending').order('created_at', { ascending: false }),
+    supabaseAdmin.from('salary_advances')
+      .select('id, amount, approved_amount, reason, status, created_at, employees!employee_id(first_name, last_name, employee_code, base_salary)')
+      .eq('status', 'pending').order('created_at', { ascending: false }),
+    supabaseAdmin.from('salary_advances')
+      .select('id, amount, approved_amount, reason, status, created_at, employees!employee_id(first_name, last_name, employee_code, base_salary)')
+      .eq('status', 'approved').gte('created_at', thirtyDaysAgo).order('created_at', { ascending: false }).limit(10),
+    supabaseAdmin.from('support_tickets')
+      .select('id, subject, message, created_at, employees!employee_id(first_name, last_name, employee_code)')
+      .eq('status', 'open').order('created_at', { ascending: false }),
+    supabaseAdmin.from('shifts').select('id, name, start_time, end_time').order('name'),
+    supabaseAdmin.from('broadcasts')
+      .select('id, message, target_shift, created_at, employees!created_by(first_name, last_name)')
+      .order('created_at', { ascending: false }).limit(10),
+    supabaseAdmin.from('company_settings').select('setting_key, setting_value'),
+    supabaseAdmin.from('employees')
+      .select('id, first_name, last_name, employee_code, admin_permissions(can_approve_leaves, can_manage_salary, can_view_reports, can_manage_shifts, can_send_broadcast)')
+      .eq('role', 'manager').eq('is_active', true),
+    session.role === 'manager'
+      ? supabaseAdmin.from('admin_permissions')
+          .select('can_approve_leaves, can_manage_salary, can_manage_shifts, can_send_broadcast')
+          .eq('employee_id', session.id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabaseAdmin.from('leave_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+    supabaseAdmin.from('salary_advances').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+    supabaseAdmin.from('support_tickets').select('*', { count: 'exact', head: true }).eq('status', 'open'),
+    supabaseAdmin.from('employees').select('*', { count: 'exact', head: true }).eq('is_active', false),
   ])
 
   const stats = [
-    {
-      label: 'Pending Registrations',
-      value: pendingRegistrations ?? 0,
-      icon: Users,
-      color: 'text-yellow-400',
-      bg: 'bg-yellow-500/10',
-    },
-    {
-      label: 'Pending Leaves',
-      value: pendingLeaves ?? 0,
-      icon: CalendarCheck,
-      color: 'text-blue-400',
-      bg: 'bg-blue-500/10',
-    },
-    {
-      label: 'Pending Advances',
-      value: pendingAdvances ?? 0,
-      icon: Banknote,
-      color: 'text-purple-400',
-      bg: 'bg-purple-500/10',
-    },
-    {
-      label: 'Open Tickets',
-      value: openTickets ?? 0,
-      icon: Ticket,
-      color: 'text-red-400',
-      bg: 'bg-red-500/10',
-    },
+    { label: 'Pending Registrations', value: pendingRegCount ?? 0,    icon: Users,         color: 'text-yellow-400', bg: 'bg-yellow-500/10' },
+    { label: 'Pending Leaves',        value: pendingLeaveCount ?? 0,   icon: CalendarCheck, color: 'text-blue-400',   bg: 'bg-blue-500/10'   },
+    { label: 'Pending Advances',      value: pendingAdvanceCount ?? 0, icon: Banknote,      color: 'text-purple-400', bg: 'bg-purple-500/10' },
+    { label: 'Open Tickets',          value: openTicketCount ?? 0,     icon: Ticket,        color: 'text-red-400',    bg: 'bg-red-500/10'    },
   ]
 
   return (
     <div className="min-h-screen bg-zinc-950">
       {/* Top Bar */}
-      <header className="border-b border-zinc-800 bg-zinc-900 px-6 py-4 flex items-center justify-between">
+      <header className="border-b border-zinc-800 bg-zinc-900 px-4 sm:px-6 py-3 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-blue-600 rounded-md flex items-center justify-center">
+          <div className="w-7 h-7 bg-blue-600 rounded-md flex items-center justify-center shrink-0">
             <span className="text-white font-bold text-xs">E</span>
           </div>
           <span className="font-semibold text-white text-sm">ESAM HR — Admin</span>
@@ -81,27 +87,24 @@ export default async function AdminDashboard() {
         <div className="flex items-center gap-3">
           <Badge variant="secondary" className="text-xs capitalize">{session.role.replace('_', ' ')}</Badge>
           <form action="/api/auth/logout" method="POST">
-            <button
-              type="submit"
-              className="text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
-            >
+            <button type="submit" className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors">
               Sign out
             </button>
           </form>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+      <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
-          <p className="text-zinc-400 text-sm mt-1">Overview of pending actions</p>
+          <h1 className="text-xl font-bold text-white">Admin Dashboard</h1>
+          <p className="text-zinc-400 text-xs mt-0.5">Manage employees, leaves, advances, and settings</p>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {stats.map((s) => (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {stats.map(s => (
             <Card key={s.label} className="bg-zinc-900 border-zinc-800">
-              <CardHeader className="pb-2 pt-4 px-4">
+              <CardHeader className="pb-1 pt-4 px-4">
                 <CardTitle className="text-xs text-zinc-400 font-medium flex items-center gap-1.5">
                   <div className={`${s.bg} rounded p-1`}>
                     <s.icon className={`w-3 h-3 ${s.color}`} />
@@ -110,29 +113,33 @@ export default async function AdminDashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-4 pb-4">
-                <p className={`text-3xl font-bold ${s.value > 0 ? s.color : 'text-zinc-500'}`}>
-                  {s.value}
-                </p>
+                <p className={`text-3xl font-bold ${s.value > 0 ? s.color : 'text-zinc-500'}`}>{s.value}</p>
               </CardContent>
             </Card>
           ))}
         </div>
 
-        {/* Phase 3 placeholders */}
-        <div className="grid md:grid-cols-2 gap-4">
-          {[
-            'New Employee Approvals — Phase 3',
-            'Leave Management — Phase 3',
-            'Salary Advances — Phase 3',
-            'Attendance Sheet — Phase 4',
-          ].map((label) => (
-            <Card key={label} className="bg-zinc-900 border-zinc-800 border-dashed opacity-60">
-              <CardContent className="flex items-center justify-center h-32 text-zinc-500 text-sm">
-                {label}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        {/* Main tabbed interface */}
+        <Card className="bg-zinc-900 border-zinc-800">
+          <CardContent className="pt-4">
+            <AdminTabs
+              role={session.role}
+              permissions={currentPermissions as {
+                can_approve_leaves: boolean; can_manage_salary: boolean
+                can_manage_shifts: boolean; can_send_broadcast: boolean
+              } | null}
+              pendingEmployees={(pendingEmployees || []) as Parameters<typeof AdminTabs>[0]['pendingEmployees']}
+              pendingLeaves={(pendingLeaves || []) as Parameters<typeof AdminTabs>[0]['pendingLeaves']}
+              pendingAdvances={(pendingAdvances || []) as Parameters<typeof AdminTabs>[0]['pendingAdvances']}
+              recentApprovedAdvances={(recentApprovedAdvances || []) as Parameters<typeof AdminTabs>[0]['recentApprovedAdvances']}
+              openTickets={(openTickets || []) as Parameters<typeof AdminTabs>[0]['openTickets']}
+              shifts={shifts || []}
+              recentBroadcasts={(recentBroadcasts || []) as Parameters<typeof AdminTabs>[0]['recentBroadcasts']}
+              companySettings={companySettings || []}
+              managers={(managers || []) as Parameters<typeof AdminTabs>[0]['managers']}
+            />
+          </CardContent>
+        </Card>
       </main>
     </div>
   )
