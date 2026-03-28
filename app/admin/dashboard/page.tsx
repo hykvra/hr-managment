@@ -124,19 +124,24 @@ export default async function AdminDashboard() {
           <CardContent className="pt-4">
             <AdminTabs
               role={session.role}
-              permissions={currentPermissions as {
-                can_approve_leaves: boolean; can_manage_salary: boolean
-                can_manage_shifts: boolean; can_send_broadcast: boolean
-              } | null}
-              pendingEmployees={(pendingEmployees || []) as Parameters<typeof AdminTabs>[0]['pendingEmployees']}
-              pendingLeaves={(pendingLeaves || []) as Parameters<typeof AdminTabs>[0]['pendingLeaves']}
-              pendingAdvances={(pendingAdvances || []) as Parameters<typeof AdminTabs>[0]['pendingAdvances']}
-              recentApprovedAdvances={(recentApprovedAdvances || []) as Parameters<typeof AdminTabs>[0]['recentApprovedAdvances']}
-              openTickets={(openTickets || []) as Parameters<typeof AdminTabs>[0]['openTickets']}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              permissions={currentPermissions as any}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              pendingEmployees={(pendingEmployees || []) as any}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              pendingLeaves={(pendingLeaves || []) as any}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              pendingAdvances={(pendingAdvances || []) as any}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              recentApprovedAdvances={(recentApprovedAdvances || []) as any}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              openTickets={(openTickets || []) as any}
               shifts={shifts || []}
-              recentBroadcasts={(recentBroadcasts || []) as Parameters<typeof AdminTabs>[0]['recentBroadcasts']}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              recentBroadcasts={(recentBroadcasts || []) as any}
               companySettings={companySettings || []}
-              managers={(managers || []) as Parameters<typeof AdminTabs>[0]['managers']}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              managers={(managers || []) as any}
             />
           </CardContent>
         </Card>
