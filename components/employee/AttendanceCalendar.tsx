@@ -38,7 +38,6 @@ export function AttendanceCalendar({ initialAttendance, leaveRequests, initialYe
   const [loading, setLoading] = useState(false)
 
   const isCurrentMonth = year === today.getFullYear() && month === (today.getMonth() + 1)
-  const isInitialMonth = year === initialYear && month === initialMonth
 
   async function loadMonth(y: number, m: number) {
     if (y === initialYear && m === initialMonth) {

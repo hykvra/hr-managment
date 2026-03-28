@@ -1,7 +1,6 @@
 'use client'
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import type { LeaveRequest, SalaryAdvance, SupportTicket, SalaryHistoryRecord, BonusHistoryRecord } from '@/types'
 
@@ -73,7 +72,7 @@ export function HistoryTabs({ leaveRequests, advances, tickets, salaryHistory, b
                         {fmt(lr.leave_date)}{lr.end_date ? ` → ${fmt(lr.end_date)}` : ''}
                       </p>
                       {lr.manager_comment && (
-                        <p className="text-xs text-zinc-400 mt-0.5 italic">"{lr.manager_comment}"</p>
+                        <p className="text-xs text-zinc-400 mt-0.5 italic">&quot;{lr.manager_comment}&quot;</p>
                       )}
                     </div>
                     {statusBadge(lr.status)}
