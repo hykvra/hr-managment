@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Users, CalendarCheck, Banknote, Ticket, Clock, Megaphone, Settings } from 'lucide-react'
+import { Users, CalendarCheck, Banknote, Ticket, Clock, Megaphone, Settings, Wallet } from 'lucide-react'
 import { EmployeeApprovals } from './EmployeeApprovals'
 import { LeaveManagement } from './LeaveManagement'
 import { AdvanceManagement } from './AdvanceManagement'
@@ -9,6 +9,7 @@ import { TicketManagement } from './TicketManagement'
 import { ShiftManagement } from './ShiftManagement'
 import { BroadcastPanel } from './BroadcastPanel'
 import { PolicySettings } from './PolicySettings'
+import { PayrollRun } from './PayrollRun'
 
 // ── Data types ────────────────────────────────────────────────────────────────
 
@@ -73,6 +74,7 @@ const TAB_CONFIG = [
   { id: 'tickets',     label: 'Tickets',    Icon: Ticket,        alwaysManager: true },
   { id: 'shifts',      label: 'Shifts',     Icon: Clock,         perm: 'can_manage_shifts'  },
   { id: 'broadcasts',  label: 'Broadcasts', Icon: Megaphone,     perm: 'can_send_broadcast' },
+  { id: 'payroll',     label: 'Payroll',    Icon: Wallet,        masterOnly: true  },
   { id: 'settings',    label: 'Settings',   Icon: Settings,      masterOnly: true  },
 ] as const
 
@@ -157,6 +159,9 @@ export function AdminTabs({
         )}
         {active === 'broadcasts' && (
           <BroadcastPanel shifts={shifts} recentBroadcasts={recentBroadcasts} />
+        )}
+        {active === 'payroll' && (
+          <PayrollRun />
         )}
         {active === 'settings' && (
           <PolicySettings companySettings={companySettings} managers={managers} />
