@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
       .from('employees')
       .select('id')
       .eq('email', email.toLowerCase().trim())
-      .single()
+      .maybeSingle()
 
     if (existing) {
       return NextResponse.json({ error: 'Email is already registered' }, { status: 409 })

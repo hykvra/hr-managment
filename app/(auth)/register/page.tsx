@@ -12,7 +12,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { supabase } from '@/lib/supabase'
 
 // ── Schema ────────────────────────────────────────────────────
 const registerSchema = z.object({
@@ -108,25 +107,24 @@ export default function RegisterPage() {
     setUploading(true)
     setUploadError('')
 
-    const ext = file.name.split('.').pop()
-    const fileName = `photos/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
 
-    const { data, error: uploadErr } = await supabase.storage
-      .from('employee-documents')
-      .upload(fileName, file, { upsert: false })
+      const res = await fetch('/api/upload/photo', { method: 'POST', body: fd })
+      const json = await res.json() as { url?: string; error?: string }
 
-    if (uploadErr || !data) {
+      if (!res.ok || !json.url) {
+        setUploadError(json.error || 'Upload failed. Please try again.')
+        return
+      }
+
+      setProfilePhotoUrl(json.url)
+    } catch {
       setUploadError('Upload failed. Please try again.')
+    } finally {
       setUploading(false)
-      return
     }
-
-    const { data: urlData } = supabase.storage
-      .from('employee-documents')
-      .getPublicUrl(data.path)
-
-    setProfilePhotoUrl(urlData.publicUrl)
-    setUploading(false)
   }
 
   // ── Final submit ───────────────────────────────────────────
