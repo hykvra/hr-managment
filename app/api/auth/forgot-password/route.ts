@@ -13,16 +13,25 @@ export async function POST(req: NextRequest) {
     }
 
     // Resolve tenant from subdomain slug (injected by middleware)
-    const tenantSlug = req.headers.get('x-tenant-slug') ?? (process.env.NEXT_PUBLIC_DEFAULT_TENANT_SLUG ?? 'esam')
+    const tenantSlug = req.headers.get('x-tenant-slug') ?? (process.env.NEXT_PUBLIC_DEFAULT_TENANT_SLUG ?? '')
     const tenantId = await resolveTenantId(tenantSlug)
 
+    console.log('[forgot-password] slug:', tenantSlug, '| tenantId:', tenantId, '| email:', email)
+
+    if (!tenantId) {
+      console.error('[forgot-password] tenant not resolved for slug:', tenantSlug)
+      return NextResponse.json({ success: true })
+    }
+
     // Check employee exists within this tenant
-    const { data: employee } = await supabaseAdmin
+    const { data: employee, error: empError } = await supabaseAdmin
       .from('employees')
       .select('id, email')
       .eq('email', email.toLowerCase().trim())
-      .eq('tenant_id', tenantId ?? '')
-      .single()
+      .eq('tenant_id', tenantId)
+      .maybeSingle()
+
+    console.log('[forgot-password] employee found:', !!employee, '| error:', empError?.message)
 
     // Always return success to prevent email enumeration
     if (!employee) {
