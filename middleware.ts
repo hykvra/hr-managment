@@ -10,6 +10,7 @@ const PUBLIC_PATHS = [
   '/register',
   '/signup',
   '/find-workspace',
+  '/onboarding',
   '/suspended',
   '/trial-expired',
   '/api/auth/login',
@@ -106,6 +107,11 @@ export async function middleware(req: NextRequest) {
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET)
     const role = payload.role as string
+
+    // First-login master admin → onboarding wizard
+    if (payload.first_login && payload.role === 'master_admin' && pathname !== '/onboarding') {
+      return NextResponse.redirect(new URL('/onboarding', req.url))
+    }
 
     // Admin routes require manager+ or master_admin
     if (pathname.startsWith('/admin')) {
