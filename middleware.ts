@@ -9,6 +9,7 @@ const PUBLIC_PATHS = [
   '/login',
   '/register',
   '/signup',
+  '/find-workspace',
   '/suspended',
   '/trial-expired',
   '/api/auth/login',
@@ -79,7 +80,11 @@ export async function middleware(req: NextRequest) {
     ) {
       return NextResponse.next({ request: { headers: baseHeaders } })
     }
-    // Any tenant-specific route on root domain → back to homepage
+    // /login on root domain → find-workspace page
+    if (pathname === '/login') {
+      return NextResponse.redirect(new URL('/find-workspace', req.url))
+    }
+    // Any other tenant-specific route on root domain → back to homepage
     return NextResponse.redirect(new URL('/', req.url))
   }
 

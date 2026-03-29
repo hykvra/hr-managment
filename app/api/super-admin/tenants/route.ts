@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const { company_name, slug, plan, max_employees, admin_email, admin_password, admin_name } = body
+  const { company_name, slug, plan, max_employees, admin_email, admin_password, admin_name, company_domain } = body
 
   if (!company_name?.trim() || !slug?.trim() || !admin_email?.trim() || !admin_password) {
     return NextResponse.json({ error: 'company_name, slug, admin_email and admin_password are required' }, { status: 400 })
@@ -77,6 +77,7 @@ export async function POST(req: NextRequest) {
       plan: plan || 'starter',
       status: 'active',
       max_employees: Number(max_employees) || 25,
+      ...(company_domain?.trim() ? { company_domain: company_domain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '') } : {}),
     })
     .select('id')
     .single()

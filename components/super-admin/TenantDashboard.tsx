@@ -33,6 +33,7 @@ type Tenant = {
 const createSchema = z.object({
   company_name: z.string().min(2, 'Company name required'),
   slug: z.string().min(2).regex(/^[a-z0-9-]+$/, 'Lowercase letters, numbers, hyphens only'),
+  company_domain: z.string().optional(),
   plan: z.enum(['starter', 'pro', 'enterprise']),
   max_employees: z.preprocess(v => Number(v), z.number().min(1).max(10000)),
   admin_email: z.string().email('Valid email required'),
@@ -343,6 +344,16 @@ export function TenantDashboard({ tenants: initial, superAdminName }: Props) {
                     {...createForm.register('max_employees')}
                   />
                 </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-zinc-300 text-xs">Company Domain <span className="text-zinc-500">(optional — for workspace lookup)</span></Label>
+                <Input
+                  placeholder="e.g. hykvra.com"
+                  className="bg-zinc-800 border-zinc-700 text-white text-sm placeholder:text-zinc-500 focus:border-violet-500"
+                  {...createForm.register('company_domain')}
+                />
+                <p className="text-zinc-500 text-[10px]">Employees use this to find their portal at hrjo.in/find-workspace</p>
               </div>
 
               <hr className="border-zinc-800" />

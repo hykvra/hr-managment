@@ -208,6 +208,15 @@ export default function LoginPage() {
                   Register
                 </Link>
               </p>
+              <p className="text-center text-sm text-zinc-500 mt-2">
+                Don&apos;t know your workspace?{' '}
+                <a
+                  href={`${typeof window !== 'undefined' ? window.location.protocol + '//' + window.location.host.replace(/^[^.]+\./, '') : 'https://hrjo.in'}/find-workspace`}
+                  className="text-violet-400 hover:text-violet-300"
+                >
+                  Find it here
+                </a>
+              </p>
             </CardContent>
           </Card>
         )}
