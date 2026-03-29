@@ -8,7 +8,7 @@ import { z } from 'zod'
 import {
   Plus, Edit2, Users, CheckCircle2, Clock, XCircle,
   ExternalLink, Loader2, Building2, Globe, Shield, UserPlus, ChevronRight, X,
-  Trash2, Activity, AlertTriangle, RefreshCw, UserCheck, UserX, Settings2,
+  Trash2, Activity, AlertTriangle, RefreshCw, UserCheck, Settings2,
   Search, Filter, LogIn, LogOut, CreditCard, Calendar, TrendingUp, FileText
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
