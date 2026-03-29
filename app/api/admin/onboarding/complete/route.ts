@@ -52,7 +52,10 @@ export async function POST(req: NextRequest) {
     first_login: false,
   })
 
-  const cookieOpts = setAuthCookie(newToken) as Parameters<NextResponse['cookies']['set']>[0]
+  const cookieOpts = setAuthCookie(newToken) as {
+    name: string; value: string; httpOnly: boolean
+    secure: boolean; sameSite: 'lax'; maxAge: number; path: string
+  }
   const response = NextResponse.json({ success: true })
   response.cookies.set(cookieOpts)
   return response

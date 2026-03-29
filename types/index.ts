@@ -6,6 +6,7 @@ export interface JWTPayload {
   shift_id: string | null
   email: string
   tenant_id: string
+  first_login?: boolean
 }
 
 export interface Employee {
