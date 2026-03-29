@@ -12,6 +12,15 @@ async function canManageShifts(role: string, userId: string): Promise<boolean> {
   return (data as { can_manage_shifts: boolean } | null)?.can_manage_shifts === true
 }
 
+export async function GET() {
+  const session = await getSession()
+  if (!session || !['master_admin', 'manager', 'attendance'].includes(session.role)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  const { data } = await supabaseAdmin.from('shifts').select('id, name, start_time, end_time').order('name')
+  return NextResponse.json({ shifts: data || [] })
+}
+
 export async function POST(req: Request) {
   const session = await getSession()
   if (!session || !['master_admin', 'manager'].includes(session.role)) {

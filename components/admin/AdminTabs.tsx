@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Users, CalendarCheck, Banknote, Ticket, Clock, Megaphone, Settings, Wallet } from 'lucide-react'
+import { Users, CalendarCheck, Banknote, Ticket, Clock, Megaphone, Settings, Wallet, UserCog } from 'lucide-react'
 import { EmployeeApprovals } from './EmployeeApprovals'
 import { LeaveManagement } from './LeaveManagement'
 import { AdvanceManagement } from './AdvanceManagement'
@@ -10,6 +10,7 @@ import { ShiftManagement } from './ShiftManagement'
 import { BroadcastPanel } from './BroadcastPanel'
 import { PolicySettings } from './PolicySettings'
 import { PayrollRun } from './PayrollRun'
+import { EmployeeManagement } from './EmployeeManagement'
 
 // ── Data types ────────────────────────────────────────────────────────────────
 
@@ -69,6 +70,7 @@ interface Props {
 
 const TAB_CONFIG = [
   { id: 'approvals',   label: 'Approvals',  Icon: Users,        masterOnly: true  },
+  { id: 'employees',   label: 'Employees',  Icon: UserCog,      masterOnly: true  },
   { id: 'leaves',      label: 'Leaves',     Icon: CalendarCheck, perm: 'can_approve_leaves' },
   { id: 'advances',    label: 'Advances',   Icon: Banknote,      perm: 'can_manage_salary'  },
   { id: 'tickets',     label: 'Tickets',    Icon: Ticket,        alwaysManager: true },
@@ -141,6 +143,9 @@ export function AdminTabs({
       <div className="min-h-[200px]">
         {active === 'approvals' && (
           <EmployeeApprovals pendingEmployees={pendingEmployees} shifts={shifts} />
+        )}
+        {active === 'employees' && (
+          <EmployeeManagement />
         )}
         {active === 'leaves' && (
           <LeaveManagement pendingLeaves={pendingLeaves} />

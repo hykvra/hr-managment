@@ -62,5 +62,104 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ success: true })
   }
 
+  // ── Actions for existing active employees ────────────────────────────────
+
+  if (action === 'salary_update') {
+    const { new_salary, message } = body
+    if (!new_salary || Number(new_salary) <= 0) {
+      return NextResponse.json({ error: 'Valid salary is required' }, { status: 400 })
+    }
+
+    const { data: emp } = await supabaseAdmin
+      .from('employees')
+      .select('base_salary')
+      .eq('id', params.id)
+      .single()
+
+    if (!emp) return NextResponse.json({ error: 'Employee not found' }, { status: 404 })
+
+    const today = new Date().toISOString().split('T')[0]
+
+    const [{ error: updateErr }, { error: histErr }] = await Promise.all([
+      supabaseAdmin.from('employees').update({
+        base_salary: Number(new_salary),
+        increment_message: message?.trim() || null,
+      }).eq('id', params.id),
+      supabaseAdmin.from('salary_history').insert({
+        employee_id: params.id,
+        old_salary: Number(emp.base_salary),
+        new_salary: Number(new_salary),
+        start_month: today,
+      }),
+    ])
+
+    if (updateErr || histErr) {
+      return NextResponse.json({ error: 'Failed to update salary' }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true })
+  }
+
+  if (action === 'add_bonus') {
+    const { amount, reason, bonus_month } = body
+    if (!amount || Number(amount) <= 0) {
+      return NextResponse.json({ error: 'Valid bonus amount is required' }, { status: 400 })
+    }
+    if (!reason?.trim()) {
+      return NextResponse.json({ error: 'Reason is required' }, { status: 400 })
+    }
+
+    const month = bonus_month || new Date().toISOString().split('T')[0]
+
+    const [{ error: bonusErr }, { error: msgErr }] = await Promise.all([
+      supabaseAdmin.from('bonus_history').insert({
+        employee_id: params.id,
+        amount: Number(amount),
+        reason: reason.trim(),
+        bonus_month: month,
+      }),
+      supabaseAdmin.from('employees').update({
+        bonus_message: `₹${Number(amount).toLocaleString('en-IN')} bonus — ${reason.trim()}`,
+      }).eq('id', params.id),
+    ])
+
+    if (bonusErr || msgErr) {
+      return NextResponse.json({ error: 'Failed to add bonus' }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true })
+  }
+
+  if (action === 'shift_change') {
+    const { shift_id } = body
+    const { error } = await supabaseAdmin
+      .from('employees')
+      .update({ shift_id: shift_id || null })
+      .eq('id', params.id)
+
+    if (error) return NextResponse.json({ error: 'Failed to change shift' }, { status: 500 })
+    return NextResponse.json({ success: true })
+  }
+
+  if (action === 'deactivate') {
+    const { error } = await supabaseAdmin
+      .from('employees')
+      .update({ is_active: false })
+      .eq('id', params.id)
+
+    if (error) return NextResponse.json({ error: 'Failed to deactivate employee' }, { status: 500 })
+    return NextResponse.json({ success: true })
+  }
+
+  if (action === 'reactivate') {
+    const { error } = await supabaseAdmin
+      .from('employees')
+      .update({ is_active: true })
+      .eq('id', params.id)
+
+    if (error) return NextResponse.json({ error: 'Failed to reactivate employee' }, { status: 500 })
+    return NextResponse.json({ success: true })
+  }
+
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
 }
