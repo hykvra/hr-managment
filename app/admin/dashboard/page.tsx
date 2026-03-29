@@ -17,6 +17,7 @@ export default async function AdminDashboard() {
   }
 
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+  const tid = session.tenant_id
 
   const [
     { data: pendingEmployees },
@@ -35,36 +36,36 @@ export default async function AdminDashboard() {
     { count: pendingRegCount },
   ] = await Promise.all([
     supabaseAdmin.from('employees').select('id, first_name, last_name, email, mobile, dob, gender, profile_photo, created_at')
-      .eq('is_active', false).order('created_at', { ascending: false }),
+      .eq('tenant_id', tid).eq('is_active', false).order('created_at', { ascending: false }),
     supabaseAdmin.from('leave_requests')
       .select('id, leave_date, end_date, leave_type, exception_flag, created_at, employees!employee_id(first_name, last_name, employee_code)')
-      .eq('status', 'pending').order('created_at', { ascending: false }),
+      .eq('tenant_id', tid).eq('status', 'pending').order('created_at', { ascending: false }),
     supabaseAdmin.from('salary_advances')
       .select('id, amount, approved_amount, reason, status, created_at, employees!employee_id(first_name, last_name, employee_code, base_salary)')
-      .eq('status', 'pending').order('created_at', { ascending: false }),
+      .eq('tenant_id', tid).eq('status', 'pending').order('created_at', { ascending: false }),
     supabaseAdmin.from('salary_advances')
       .select('id, amount, approved_amount, reason, status, created_at, employees!employee_id(first_name, last_name, employee_code, base_salary)')
-      .eq('status', 'approved').gte('created_at', thirtyDaysAgo).order('created_at', { ascending: false }).limit(10),
+      .eq('tenant_id', tid).eq('status', 'approved').gte('created_at', thirtyDaysAgo).order('created_at', { ascending: false }).limit(10),
     supabaseAdmin.from('support_tickets')
       .select('id, subject, message, created_at, employees!employee_id(first_name, last_name, employee_code)')
-      .eq('status', 'open').order('created_at', { ascending: false }),
-    supabaseAdmin.from('shifts').select('id, name, start_time, end_time').order('name'),
+      .eq('tenant_id', tid).eq('status', 'open').order('created_at', { ascending: false }),
+    supabaseAdmin.from('shifts').select('id, name, start_time, end_time').eq('tenant_id', tid).order('name'),
     supabaseAdmin.from('broadcasts')
       .select('id, message, target_shift, created_at, employees!created_by(first_name, last_name)')
-      .order('created_at', { ascending: false }).limit(10),
-    supabaseAdmin.from('company_settings').select('setting_key, setting_value'),
+      .eq('tenant_id', tid).order('created_at', { ascending: false }).limit(10),
+    supabaseAdmin.from('company_settings').select('setting_key, setting_value').eq('tenant_id', tid),
     supabaseAdmin.from('employees')
       .select('id, first_name, last_name, employee_code, admin_permissions(can_approve_leaves, can_manage_salary, can_view_reports, can_manage_shifts, can_send_broadcast)')
-      .eq('role', 'manager').eq('is_active', true),
+      .eq('tenant_id', tid).eq('role', 'manager').eq('is_active', true),
     session.role === 'manager'
       ? supabaseAdmin.from('admin_permissions')
           .select('can_approve_leaves, can_manage_salary, can_manage_shifts, can_send_broadcast')
           .eq('employee_id', session.id).maybeSingle()
       : Promise.resolve({ data: null }),
-    supabaseAdmin.from('leave_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-    supabaseAdmin.from('salary_advances').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-    supabaseAdmin.from('support_tickets').select('*', { count: 'exact', head: true }).eq('status', 'open'),
-    supabaseAdmin.from('employees').select('*', { count: 'exact', head: true }).eq('is_active', false),
+    supabaseAdmin.from('leave_requests').select('*', { count: 'exact', head: true }).eq('tenant_id', tid).eq('status', 'pending'),
+    supabaseAdmin.from('salary_advances').select('*', { count: 'exact', head: true }).eq('tenant_id', tid).eq('status', 'pending'),
+    supabaseAdmin.from('support_tickets').select('*', { count: 'exact', head: true }).eq('tenant_id', tid).eq('status', 'open'),
+    supabaseAdmin.from('employees').select('*', { count: 'exact', head: true }).eq('tenant_id', tid).eq('is_active', false),
   ])
 
   const stats = [

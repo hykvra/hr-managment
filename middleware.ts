@@ -31,6 +31,31 @@ export async function middleware(req: NextRequest) {
   const baseHeaders = new Headers(req.headers)
   baseHeaders.set('x-tenant-slug', tenantSlug)
 
+  // ── Super admin routes (/super-admin/* and /api/super-admin/*) ───────────
+  if (pathname.startsWith('/super-admin')) {
+    if (pathname === '/super-admin/login') {
+      return NextResponse.next({ request: { headers: baseHeaders } })
+    }
+    const superToken = req.cookies.get('hrjo_super_token')?.value
+    if (!superToken) {
+      return NextResponse.redirect(new URL('/super-admin/login', req.url))
+    }
+    try {
+      const { payload } = await jwtVerify(superToken, JWT_SECRET)
+      if (payload.type !== 'super_admin') throw new Error('not super admin')
+      return NextResponse.next({ request: { headers: baseHeaders } })
+    } catch {
+      const res = NextResponse.redirect(new URL('/super-admin/login', req.url))
+      res.cookies.delete('hrjo_super_token')
+      return res
+    }
+  }
+
+  // Super admin API routes self-authenticate via getSuperSession()
+  if (pathname.startsWith('/api/super-admin/')) {
+    return NextResponse.next({ request: { headers: baseHeaders } })
+  }
+
   // Allow public paths and static files
   if (
     PUBLIC_PATHS.includes(pathname) ||
