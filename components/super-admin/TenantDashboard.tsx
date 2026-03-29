@@ -8,7 +8,8 @@ import { z } from 'zod'
 import {
   Plus, Edit2, Users, CheckCircle2, Clock, XCircle,
   ExternalLink, Loader2, Building2, Globe, Shield, UserPlus, ChevronRight, X,
-  Trash2, Activity, AlertTriangle, RefreshCw, UserCheck, UserX, Settings2
+  Trash2, Activity, AlertTriangle, RefreshCw, UserCheck, UserX, Settings2,
+  Search, Filter, LogIn, LogOut, CreditCard, Calendar, TrendingUp, FileText
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -43,13 +44,29 @@ type Employee = {
 type LogEntry = {
   id: string
   action: string
-  entity_type: string
+  entity_type: string | null
   entity_id: string | null
   entity_name: string | null
   details: Record<string, unknown>
-  performed_by: string
+  actor_email: string | null
+  actor_role: string | null
+  tenant_id: string | null
+  tenant_slug: string | null
+  ip_address: string | null
   created_at: string
 }
+
+const LOG_CATEGORIES = [
+  { value: 'all',         label: 'All Activity' },
+  { value: 'auth',        label: 'Auth' },
+  { value: 'attendance',  label: 'Attendance' },
+  { value: 'leaves',      label: 'Leaves' },
+  { value: 'payroll',     label: 'Payroll' },
+  { value: 'employees',   label: 'Employees' },
+  { value: 'advances',    label: 'Advances' },
+  { value: 'resignation', label: 'Resignation' },
+  { value: 'super_admin', label: 'Super Admin' },
+]
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
@@ -104,45 +121,77 @@ function slugify(str: string) {
 
 function logLabel(action: string): string {
   const map: Record<string, string> = {
-    create_tenant:    'Tenant Created',
-    edit_tenant:      'Tenant Updated',
-    delete_tenant:    'Tenant Deleted',
-    suspend_tenant:   'Tenant Suspended',
-    activate_tenant:  'Tenant Activated',
-    add_employee:     'Employee Added',
-    delete_employee:  'Employee Removed',
-    toggle_employee:  'Employee Status Changed',
-    super_login:      'Super Admin Login',
-    super_logout:     'Super Admin Logout',
+    // Auth
+    employee_login:         'Employee Login',
+    employee_login_failed:  'Login Failed',
+    employee_logout:        'Employee Logout',
+    employee_register:      'Employee Registered',
+    password_reset_otp:     'Password Reset OTP',
+    password_reset_complete:'Password Reset',
+    super_admin_login:      'Super Admin Login',
+    super_admin_login_failed:'Super Admin Login Failed',
+    super_admin_logout:     'Super Admin Logout',
+    // Attendance
+    attendance_saved:       'Attendance Saved',
+    // Leaves
+    leave_requested:        'Leave Requested',
+    leave_approved:         'Leave Approved',
+    leave_rejected:         'Leave Rejected',
+    // Payroll
+    payroll_generated:      'Payroll Generated',
+    payroll_paid:           'Payroll Paid',
+    // Employees
+    employee_approved:      'Employee Approved',
+    employee_rejected:      'Employee Rejected',
+    employee_salary_updated:'Salary Updated',
+    employee_deactivated:   'Employee Deactivated',
+    employee_reactivated:   'Employee Reactivated',
+    // Advances
+    advance_requested:      'Advance Requested',
+    advance_approved:       'Advance Approved',
+    advance_rejected:       'Advance Rejected',
+    // Resignation
+    resignation_submitted:  'Resignation Submitted',
+    resignation_withdrawn:  'Resignation Withdrawn',
+    // Super admin
+    tenant_created:         'Tenant Created',
+    tenant_edited:          'Tenant Updated',
+    tenant_deleted:         'Tenant Deleted',
+    tenant_suspended:       'Tenant Suspended',
+    tenant_activated:       'Tenant Activated',
+    super_employee_added:   'Employee Added by Super Admin',
   }
   return map[action] ?? action.replace(/_/g, ' ')
 }
 
 function logIconBg(action: string): string {
-  if (action.includes('delete') || action.includes('suspend')) return 'bg-red-500/10'
-  if (action.includes('create') || action.includes('add'))     return 'bg-emerald-500/10'
-  if (action.includes('activate'))                             return 'bg-emerald-500/10'
-  if (action.includes('login') || action.includes('logout'))   return 'bg-amber-500/10'
-  return 'bg-blue-500/10'
+  if (action.includes('failed') || action.includes('rejected') || action.includes('delete') || action.includes('suspend') || action.includes('deactivated')) return 'bg-red-500/10'
+  if (action.includes('approved') || action.includes('created') || action.includes('register') || action === 'employee_login' || action === 'super_admin_login') return 'bg-emerald-500/10'
+  if (action.includes('logout')) return 'bg-zinc-700/50'
+  if (action.includes('login')) return 'bg-amber-500/10'
+  if (action.includes('payroll') || action.includes('salary') || action.includes('advance')) return 'bg-blue-500/10'
+  if (action.includes('attendance')) return 'bg-cyan-500/10'
+  if (action.includes('leave') || action.includes('resignation')) return 'bg-orange-500/10'
+  return 'bg-zinc-700/50'
 }
 
 function logIcon(action: string) {
   const cls = 'w-3.5 h-3.5'
-  if (action.includes('delete') || action.includes('suspend'))
-    return <Trash2 className={`${cls} text-red-400`} />
-  if (action === 'create_tenant')
-    return <Building2 className={`${cls} text-emerald-400`} />
-  if (action === 'add_employee')
-    return <UserCheck className={`${cls} text-emerald-400`} />
-  if (action === 'delete_employee')
-    return <UserX className={`${cls} text-red-400`} />
-  if (action.includes('activate'))
-    return <CheckCircle2 className={`${cls} text-emerald-400`} />
-  if (action.includes('edit'))
-    return <Edit2 className={`${cls} text-blue-400`} />
-  if (action.includes('login') || action.includes('logout'))
-    return <Shield className={`${cls} text-amber-400`} />
-  return <Activity className={`${cls} text-blue-400`} />
+  if (action === 'employee_login' || action === 'super_admin_login') return <LogIn className={`${cls} text-emerald-400`} />
+  if (action === 'employee_logout' || action === 'super_admin_logout') return <LogOut className={`${cls} text-zinc-400`} />
+  if (action.includes('login_failed')) return <XCircle className={`${cls} text-red-400`} />
+  if (action.includes('register')) return <UserCheck className={`${cls} text-emerald-400`} />
+  if (action.includes('attendance')) return <Calendar className={`${cls} text-cyan-400`} />
+  if (action.includes('payroll') || action.includes('salary')) return <CreditCard className={`${cls} text-blue-400`} />
+  if (action.includes('advance')) return <TrendingUp className={`${cls} text-blue-400`} />
+  if (action.includes('leave') || action.includes('resignation')) return <FileText className={`${cls} text-orange-400`} />
+  if (action.includes('approved') || action.includes('activate')) return <CheckCircle2 className={`${cls} text-emerald-400`} />
+  if (action.includes('rejected') || action.includes('delete') || action.includes('deactivated')) return <Trash2 className={`${cls} text-red-400`} />
+  if (action.includes('suspend')) return <XCircle className={`${cls} text-red-400`} />
+  if (action === 'tenant_created') return <Building2 className={`${cls} text-emerald-400`} />
+  if (action === 'super_employee_added') return <UserPlus className={`${cls} text-violet-400`} />
+  if (action.includes('edit')) return <Edit2 className={`${cls} text-blue-400`} />
+  return <Activity className={`${cls} text-zinc-400`} />
 }
 
 function entityTypeColor(type: string): string {
@@ -184,6 +233,10 @@ export function TenantDashboard({ tenants: initial, superAdminName }: Props) {
   // Logs state
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [logsLoading, setLogsLoading] = useState(false)
+  const [logsTotal, setLogsTotal] = useState(0)
+  const [logCategory, setLogCategory] = useState('all')
+  const [logTenantFilter, setLogTenantFilter] = useState('')
+  const [logSearch, setLogSearch] = useState('')
 
   // ── Stats ──────────────────────────────────────────────────────────────────
   const stats = {
@@ -287,12 +340,20 @@ export function TenantDashboard({ tenants: initial, superAdminName }: Props) {
     fetchTenants()
   }
 
-  const fetchLogs = async () => {
+  const fetchLogs = async (opts?: { category?: string; tenant_id?: string; search?: string }) => {
     setLogsLoading(true)
-    const res = await fetch('/api/super-admin/logs?limit=200')
+    const params = new URLSearchParams({ limit: '200' })
+    const cat = opts?.category ?? logCategory
+    const tid = opts?.tenant_id ?? logTenantFilter
+    const srch = opts?.search ?? logSearch
+    if (cat && cat !== 'all') params.set('category', cat)
+    if (tid)  params.set('tenant_id', tid)
+    if (srch) params.set('actor_email', srch)
+    const res = await fetch(`/api/super-admin/logs?${params}`)
     if (res.ok) {
       const json = await res.json()
       setLogs(json.logs)
+      setLogsTotal(json.total)
     }
     setLogsLoading(false)
   }
@@ -359,7 +420,7 @@ export function TenantDashboard({ tenants: initial, superAdminName }: Props) {
           )}
           {activeTab === 'logs' && (
             <Button
-              onClick={fetchLogs}
+              onClick={() => fetchLogs()}
               variant="outline"
               className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 text-xs gap-1.5 shrink-0"
               size="sm"
@@ -506,62 +567,142 @@ export function TenantDashboard({ tenants: initial, superAdminName }: Props) {
 
         {/* ── Activity Log Tab ──────────────────────────────────────────────── */}
         {activeTab === 'logs' && (
-          <Card className="bg-zinc-900 border-zinc-800">
-            <CardContent className="p-0">
-              {logsLoading ? (
-                <div className="flex items-center justify-center py-20">
-                  <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+          <div className="space-y-3">
+            {/* Filters bar */}
+            <Card className="bg-zinc-900 border-zinc-800">
+              <CardContent className="px-4 py-3 flex flex-wrap gap-3 items-end">
+                {/* Category filter */}
+                <div className="flex items-center gap-1.5">
+                  <Filter className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                  <select
+                    className="h-8 rounded-md border border-zinc-700 bg-zinc-800 text-white text-xs px-2 focus:border-violet-500 focus:outline-none"
+                    value={logCategory}
+                    onChange={e => {
+                      setLogCategory(e.target.value)
+                      fetchLogs({ category: e.target.value })
+                    }}
+                  >
+                    {LOG_CATEGORIES.map(c => (
+                      <option key={c.value} value={c.value}>{c.label}</option>
+                    ))}
+                  </select>
                 </div>
-              ) : logs.length === 0 ? (
-                <div className="flex flex-col items-center py-16 text-zinc-500">
-                  <Activity className="w-10 h-10 mb-3 opacity-30" />
-                  <p className="text-sm">No activity yet</p>
-                  <p className="text-xs mt-1">Actions will appear here as you manage tenants</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-zinc-800/60">
-                  {logs.map(log => (
-                    <div key={log.id} className="px-5 py-3.5 flex items-start gap-3 hover:bg-zinc-800/20 transition-colors">
-                      {/* Icon */}
-                      <div className={`mt-0.5 w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${logIconBg(log.action)}`}>
-                        {logIcon(log.action)}
-                      </div>
 
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-white text-sm font-medium">{logLabel(log.action)}</span>
-                          {log.entity_name && (
-                            <span className="text-zinc-300 text-xs bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-700 truncate max-w-[200px]">
-                              {log.entity_name}
-                            </span>
-                          )}
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${entityTypeColor(log.entity_type)}`}>
-                            {log.entity_type}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3 mt-0.5">
-                          <span className="text-zinc-500 text-xs">by {log.performed_by}</span>
-                          {log.details && Object.keys(log.details).length > 0 && (
-                            <span className="text-zinc-600 text-xs truncate hidden sm:block">
-                              {JSON.stringify(log.details).slice(0, 80)}…
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Time */}
-                      <span className="text-zinc-600 text-[11px] shrink-0 mt-0.5">
-                        {new Date(log.created_at).toLocaleString('en-IN', {
-                          day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
-                        })}
-                      </span>
-                    </div>
-                  ))}
+                {/* Tenant filter */}
+                <div className="flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                  <select
+                    className="h-8 rounded-md border border-zinc-700 bg-zinc-800 text-white text-xs px-2 focus:border-violet-500 focus:outline-none"
+                    value={logTenantFilter}
+                    onChange={e => {
+                      setLogTenantFilter(e.target.value)
+                      fetchLogs({ tenant_id: e.target.value })
+                    }}
+                  >
+                    <option value="">All Tenants</option>
+                    {tenants.map(t => (
+                      <option key={t.id} value={t.id}>{t.company_name}</option>
+                    ))}
+                  </select>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+
+                {/* Email search */}
+                <div className="relative flex-1 min-w-[180px]">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
+                  <Input
+                    placeholder="Search by email…"
+                    className="h-8 pl-8 bg-zinc-800 border-zinc-700 text-white text-xs placeholder:text-zinc-500 focus:border-violet-500"
+                    value={logSearch}
+                    onChange={e => setLogSearch(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && fetchLogs()}
+                  />
+                </div>
+
+                <Button
+                  size="sm"
+                  onClick={() => fetchLogs()}
+                  className="h-8 bg-violet-600 hover:bg-violet-700 text-white text-xs gap-1.5 shrink-0"
+                >
+                  <Search className="w-3 h-3" /> Search
+                </Button>
+
+                <span className="text-zinc-600 text-xs ml-auto">
+                  {logsTotal} event{logsTotal !== 1 ? 's' : ''}
+                </span>
+              </CardContent>
+            </Card>
+
+            {/* Log list */}
+            <Card className="bg-zinc-900 border-zinc-800">
+              <CardContent className="p-0">
+                {logsLoading ? (
+                  <div className="flex items-center justify-center py-20">
+                    <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+                  </div>
+                ) : logs.length === 0 ? (
+                  <div className="flex flex-col items-center py-16 text-zinc-500">
+                    <Activity className="w-10 h-10 mb-3 opacity-30" />
+                    <p className="text-sm">No activity found</p>
+                    <p className="text-xs mt-1">Try changing the filters or refreshing</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-zinc-800/60">
+                    {logs.map(log => (
+                      <div key={log.id} className="px-5 py-3 flex items-start gap-3 hover:bg-zinc-800/20 transition-colors">
+                        {/* Icon */}
+                        <div className={`mt-0.5 w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${logIconBg(log.action)}`}>
+                          {logIcon(log.action)}
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-white text-sm font-medium">{logLabel(log.action)}</span>
+                            {log.entity_name && (
+                              <span className="text-zinc-300 text-xs bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-700 truncate max-w-[160px]">
+                                {log.entity_name}
+                              </span>
+                            )}
+                            {log.entity_type && (
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${entityTypeColor(log.entity_type)}`}>
+                                {log.entity_type}
+                              </span>
+                            )}
+                            {log.tenant_slug && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded border font-medium text-violet-400 bg-violet-500/10 border-violet-500/20">
+                                {log.tenant_slug}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                            {log.actor_email && (
+                              <span className="text-zinc-400 text-xs flex items-center gap-1">
+                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${log.actor_role === 'super_admin' ? 'bg-violet-400' : log.actor_role === 'master_admin' ? 'bg-blue-400' : 'bg-zinc-500'}`} />
+                                {log.actor_email}
+                              </span>
+                            )}
+                            {log.actor_role && (
+                              <span className="text-zinc-600 text-[10px]">{log.actor_role.replace('_', ' ')}</span>
+                            )}
+                            {log.ip_address && (
+                              <span className="text-zinc-700 text-[10px] hidden md:block">{log.ip_address}</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Time */}
+                        <span className="text-zinc-600 text-[11px] shrink-0 mt-0.5 whitespace-nowrap">
+                          {new Date(log.created_at).toLocaleString('en-IN', {
+                            day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+                          })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         )}
       </main>
 

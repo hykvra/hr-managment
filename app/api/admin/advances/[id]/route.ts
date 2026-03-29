@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { activityLog } from '@/lib/activity-logger'
 
 async function canManageSalary(role: string, userId: string, tenantId: string): Promise<boolean> {
   if (role === 'master_admin') return true
@@ -55,6 +56,17 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   } else {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
   }
+
+  await activityLog({
+    action: action === 'approve' ? 'advance_approved' : 'advance_rejected',
+    tenant_id: tenantId,
+    actor_id: session.id,
+    actor_email: session.email,
+    actor_role: session.role,
+    entity_type: 'advance',
+    entity_id: params.id,
+    details: { action, approved_amount, comment },
+  })
 
   return NextResponse.json({ success: true })
 }

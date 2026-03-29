@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { activityLog } from '@/lib/activity-logger'
 
 export async function POST(req: Request) {
   const session = await getSession()
@@ -44,6 +45,15 @@ export async function POST(req: Request) {
   } else {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
   }
+
+  await activityLog({
+    action: action === 'submit' ? 'resignation_submitted' : 'resignation_withdrawn',
+    tenant_id: tenantId,
+    actor_id: session.id,
+    actor_email: session.email,
+    actor_role: session.role,
+    entity_type: 'employee',
+  })
 
   return NextResponse.json({ success: true })
 }

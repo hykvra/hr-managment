@@ -7,6 +7,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { sendWelcomeEmail } from '@/lib/mailer'
 import { resolveTenantId } from '@/lib/tenant'
 import { getSubscriptionInfo } from '@/lib/subscription'
+import { activityLog } from '@/lib/activity-logger'
 
 export async function POST(req: NextRequest) {
   try {
@@ -137,6 +138,18 @@ export async function POST(req: NextRequest) {
 
     // Send welcome email (non-blocking)
     sendWelcomeEmail(email, first_name).catch(console.error)
+
+    await activityLog({
+      action: 'employee_register',
+      tenant_id: tenantId,
+      tenant_slug: tenantSlug,
+      actor_id: employee.id,
+      actor_email: email,
+      actor_role: 'employee',
+      entity_type: 'employee',
+      entity_name: `${first_name} ${last_name}`,
+      req,
+    })
 
     return NextResponse.json({ success: true, id: employee.id }, { status: 201 })
   } catch (err) {

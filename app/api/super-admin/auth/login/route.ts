@@ -4,6 +4,7 @@ import bcryptjs from 'bcryptjs'
 const bcrypt = (bcryptjs as any).default ?? bcryptjs
 import { supabaseAdmin } from '@/lib/supabase'
 import { signSuperToken, setSuperAuthCookie } from '@/lib/super-auth'
+import { activityLog } from '@/lib/activity-logger'
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,6 +26,7 @@ export async function POST(req: NextRequest) {
 
     const match = await bcrypt.compare(password, admin.password_hash)
     if (!match) {
+      await activityLog({ action: 'super_admin_login_failed', actor_email: email, entity_type: 'auth', req })
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 
@@ -41,6 +43,13 @@ export async function POST(req: NextRequest) {
     }
     const response = NextResponse.json({ success: true })
     response.cookies.set(cookieOpts)
+    await activityLog({
+      action: 'super_admin_login',
+      actor_email: admin.email,
+      actor_role: 'super_admin',
+      entity_type: 'auth',
+      req,
+    })
     return response
   } catch (err) {
     console.error('Super admin login error:', err)

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { activityLog } from '@/lib/activity-logger'
 
 const ALLOWED = ['master_admin', 'manager']
 
@@ -211,6 +212,17 @@ export async function POST(req: NextRequest) {
     .upsert(rows, { onConflict: 'employee_id,month' })
 
   if (error) return NextResponse.json({ error: 'Failed to save payroll' }, { status: 500 })
+
+  await activityLog({
+    action: 'payroll_generated',
+    tenant_id: tenantId,
+    actor_id: session.id,
+    actor_email: session.email,
+    actor_role: session.role,
+    entity_type: 'payroll',
+    entity_name: month,
+    details: { month, employee_count: rows.length },
+  })
 
   return NextResponse.json({ success: true, saved: rows.length })
 }

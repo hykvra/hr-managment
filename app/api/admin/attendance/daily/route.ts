@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { activityLog } from '@/lib/activity-logger'
 
 const ALLOWED = ['master_admin', 'manager', 'attendance']
 
@@ -73,6 +74,17 @@ export async function POST(req: Request) {
     .upsert(rows, { onConflict: 'employee_id,date' })
 
   if (error) return NextResponse.json({ error: 'Failed to save attendance' }, { status: 500 })
+
+  await activityLog({
+    action: 'attendance_saved',
+    tenant_id: tenantId,
+    actor_id: session.id,
+    actor_email: session.email,
+    actor_role: session.role,
+    entity_type: 'attendance',
+    entity_name: date,
+    details: { date, count: rows.length },
+  })
 
   return NextResponse.json({ success: true, saved: rows.length })
 }

@@ -6,6 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { signToken, setAuthCookie } from '@/lib/auth'
 import { resolveTenantId } from '@/lib/tenant'
 import { getSubscriptionInfo } from '@/lib/subscription'
+import { activityLog } from '@/lib/activity-logger'
 
 export async function POST(req: NextRequest) {
   try {
@@ -57,6 +58,7 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (error || !employee) {
+      await activityLog({ action: 'employee_login_failed', tenant_id: tenantId, tenant_slug: tenantSlug, actor_email: email, details: { reason: 'not_found' }, req })
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
     }
 
@@ -69,6 +71,7 @@ export async function POST(req: NextRequest) {
 
     const passwordMatch = await bcrypt.compare(password, employee.password_hash)
     if (!passwordMatch) {
+      await activityLog({ action: 'employee_login_failed', tenant_id: tenantId, tenant_slug: tenantSlug, actor_email: email, actor_id: employee.id, details: { reason: 'wrong_password' }, req })
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
     }
 
@@ -97,6 +100,16 @@ export async function POST(req: NextRequest) {
     })
 
     response.cookies.set(cookieOpts)
+
+    await activityLog({
+      action: 'employee_login',
+      tenant_id: tenantId,
+      tenant_slug: tenantSlug,
+      actor_id: employee.id,
+      actor_email: employee.email,
+      actor_role: employee.role,
+      req,
+    })
 
     return response
   } catch (err) {
