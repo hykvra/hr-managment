@@ -4,6 +4,7 @@ import bcryptjs from 'bcryptjs'
 const bcrypt = (bcryptjs as any).default ?? bcryptjs
 import { getSuperSession } from '@/lib/super-auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { superLog } from '@/lib/super-logger'
 
 export async function GET() {
   const session = await getSuperSession()
@@ -118,6 +119,15 @@ export async function POST(req: NextRequest) {
     await supabaseAdmin.from('tenants').delete().eq('id', tenant.id)
     return NextResponse.json({ error: 'Failed to create admin account' }, { status: 500 })
   }
+
+  await superLog({
+    action: 'create_tenant',
+    entity_type: 'tenant',
+    entity_id: tenant.id,
+    entity_name: company_name.trim(),
+    details: { slug, plan: plan || 'starter', admin_email },
+    performed_by: session.email,
+  })
 
   return NextResponse.json({ success: true, tenant_id: tenant.id }, { status: 201 })
 }

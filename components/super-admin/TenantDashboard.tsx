@@ -7,7 +7,8 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import {
   Plus, Edit2, Users, CheckCircle2, Clock, XCircle,
-  ExternalLink, Loader2, Building2, Globe, Shield, UserPlus, ChevronRight, X
+  ExternalLink, Loader2, Building2, Globe, Shield, UserPlus, ChevronRight, X,
+  Trash2, Activity, AlertTriangle, RefreshCw, UserCheck, UserX, Settings2
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -36,6 +37,17 @@ type Employee = {
   role: string
   is_active: boolean
   employee_code: string
+  created_at: string
+}
+
+type LogEntry = {
+  id: string
+  action: string
+  entity_type: string
+  entity_id: string | null
+  entity_name: string | null
+  details: Record<string, unknown>
+  performed_by: string
   created_at: string
 }
 
@@ -90,6 +102,55 @@ function slugify(str: string) {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 }
 
+function logLabel(action: string): string {
+  const map: Record<string, string> = {
+    create_tenant:    'Tenant Created',
+    edit_tenant:      'Tenant Updated',
+    delete_tenant:    'Tenant Deleted',
+    suspend_tenant:   'Tenant Suspended',
+    activate_tenant:  'Tenant Activated',
+    add_employee:     'Employee Added',
+    delete_employee:  'Employee Removed',
+    toggle_employee:  'Employee Status Changed',
+    super_login:      'Super Admin Login',
+    super_logout:     'Super Admin Logout',
+  }
+  return map[action] ?? action.replace(/_/g, ' ')
+}
+
+function logIconBg(action: string): string {
+  if (action.includes('delete') || action.includes('suspend')) return 'bg-red-500/10'
+  if (action.includes('create') || action.includes('add'))     return 'bg-emerald-500/10'
+  if (action.includes('activate'))                             return 'bg-emerald-500/10'
+  if (action.includes('login') || action.includes('logout'))   return 'bg-amber-500/10'
+  return 'bg-blue-500/10'
+}
+
+function logIcon(action: string) {
+  const cls = 'w-3.5 h-3.5'
+  if (action.includes('delete') || action.includes('suspend'))
+    return <Trash2 className={`${cls} text-red-400`} />
+  if (action === 'create_tenant')
+    return <Building2 className={`${cls} text-emerald-400`} />
+  if (action === 'add_employee')
+    return <UserCheck className={`${cls} text-emerald-400`} />
+  if (action === 'delete_employee')
+    return <UserX className={`${cls} text-red-400`} />
+  if (action.includes('activate'))
+    return <CheckCircle2 className={`${cls} text-emerald-400`} />
+  if (action.includes('edit'))
+    return <Edit2 className={`${cls} text-blue-400`} />
+  if (action.includes('login') || action.includes('logout'))
+    return <Shield className={`${cls} text-amber-400`} />
+  return <Activity className={`${cls} text-blue-400`} />
+}
+
+function entityTypeColor(type: string): string {
+  if (type === 'tenant')   return 'text-violet-400 bg-violet-500/10 border-violet-500/20'
+  if (type === 'employee') return 'text-blue-400 bg-blue-500/10 border-blue-500/20'
+  return 'text-zinc-400 bg-zinc-700/50 border-zinc-600/30'
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 interface Props {
@@ -105,12 +166,24 @@ export function TenantDashboard({ tenants: initial, superAdminName }: Props) {
   const [apiError, setApiError] = useState('')
   const [editError, setEditError] = useState('')
 
+  // Tabs
+  const [activeTab, setActiveTab] = useState<'tenants' | 'logs'>('tenants')
+
   // Employee panel state
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null)
   const [employees, setEmployees] = useState<Employee[]>([])
   const [empLoading, setEmpLoading] = useState(false)
   const [showAddEmployee, setShowAddEmployee] = useState(false)
   const [addEmpError, setAddEmpError] = useState('')
+
+  // Delete tenant state
+  const [confirmDelete, setConfirmDelete] = useState<Tenant | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+
+  // Logs state
+  const [logs, setLogs] = useState<LogEntry[]>([])
+  const [logsLoading, setLogsLoading] = useState(false)
 
   // ── Stats ──────────────────────────────────────────────────────────────────
   const stats = {
@@ -214,6 +287,32 @@ export function TenantDashboard({ tenants: initial, superAdminName }: Props) {
     fetchTenants()
   }
 
+  const fetchLogs = async () => {
+    setLogsLoading(true)
+    const res = await fetch('/api/super-admin/logs?limit=200')
+    if (res.ok) {
+      const json = await res.json()
+      setLogs(json.logs)
+    }
+    setLogsLoading(false)
+  }
+
+  const deleteTenant = async () => {
+    if (!confirmDelete) return
+    setDeleting(true)
+    setDeleteError('')
+    const res = await fetch(`/api/super-admin/tenants/${confirmDelete.id}`, { method: 'DELETE' })
+    const json = await res.json()
+    if (!res.ok) {
+      setDeleteError(json.error || 'Failed to delete')
+      setDeleting(false)
+      return
+    }
+    setConfirmDelete(null)
+    setDeleting(false)
+    fetchTenants()
+  }
+
   const roleColor = (role: string) => {
     if (role === 'master_admin') return 'text-violet-400 bg-violet-500/10 border-violet-500/20'
     if (role === 'manager') return 'text-blue-400 bg-blue-500/10 border-blue-500/20'
@@ -246,17 +345,56 @@ export function TenantDashboard({ tenants: initial, superAdminName }: Props) {
         {/* Title row */}
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-xl font-bold text-white">Tenant Management</h1>
+            <h1 className="text-xl font-bold text-white">Super Admin</h1>
             <p className="text-zinc-400 text-xs mt-0.5">Manage all client workspaces on hrjo.in</p>
           </div>
-          <Button
-            onClick={() => { setShowCreate(true); setApiError('') }}
-            className="bg-violet-600 hover:bg-violet-700 text-white text-xs gap-1.5 shrink-0"
-            size="sm"
-          >
-            <Plus className="w-3.5 h-3.5" /> New Tenant
-          </Button>
+          {activeTab === 'tenants' && (
+            <Button
+              onClick={() => { setShowCreate(true); setApiError('') }}
+              className="bg-violet-600 hover:bg-violet-700 text-white text-xs gap-1.5 shrink-0"
+              size="sm"
+            >
+              <Plus className="w-3.5 h-3.5" /> New Tenant
+            </Button>
+          )}
+          {activeTab === 'logs' && (
+            <Button
+              onClick={fetchLogs}
+              variant="outline"
+              className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 text-xs gap-1.5 shrink-0"
+              size="sm"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> Refresh
+            </Button>
+          )}
         </div>
+
+        {/* Tabs */}
+        <div className="flex items-center gap-1 border-b border-zinc-800">
+          <button
+            onClick={() => setActiveTab('tenants')}
+            className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium transition-colors border-b-2 -mb-px ${
+              activeTab === 'tenants'
+                ? 'border-violet-500 text-violet-400'
+                : 'border-transparent text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5" /> Tenants
+          </button>
+          <button
+            onClick={() => { setActiveTab('logs'); if (logs.length === 0) fetchLogs() }}
+            className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium transition-colors border-b-2 -mb-px ${
+              activeTab === 'logs'
+                ? 'border-violet-500 text-violet-400'
+                : 'border-transparent text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5" /> Activity Log
+          </button>
+        </div>
+
+        {/* ── Tenants Tab ───────────────────────────────────────────────────── */}
+        {activeTab === 'tenants' && <>
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -325,11 +463,11 @@ export function TenantDashboard({ tenants: initial, superAdminName }: Props) {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <button
                         onClick={() => openTenantEmployees(t)}
                         className="flex items-center gap-1 text-xs text-violet-400 hover:text-violet-300 hover:bg-violet-500/10 px-2 py-1 rounded transition-colors border border-violet-500/20"
-                        title="Manage employees"
+                        title="Manage employees & admins"
                       >
                         <Users className="w-3 h-3" /> Manage
                       </button>
@@ -347,7 +485,14 @@ export function TenantDashboard({ tenants: initial, superAdminName }: Props) {
                         className="p-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 rounded transition-colors"
                         title="Edit tenant"
                       >
-                        <Edit2 className="w-3.5 h-3.5" />
+                        <Settings2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => { setConfirmDelete(t); setDeleteError('') }}
+                        className="p-1.5 text-zinc-600 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                        title="Delete tenant"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
@@ -356,7 +501,125 @@ export function TenantDashboard({ tenants: initial, superAdminName }: Props) {
             )}
           </CardContent>
         </Card>
+
+        </>}
+
+        {/* ── Activity Log Tab ──────────────────────────────────────────────── */}
+        {activeTab === 'logs' && (
+          <Card className="bg-zinc-900 border-zinc-800">
+            <CardContent className="p-0">
+              {logsLoading ? (
+                <div className="flex items-center justify-center py-20">
+                  <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+                </div>
+              ) : logs.length === 0 ? (
+                <div className="flex flex-col items-center py-16 text-zinc-500">
+                  <Activity className="w-10 h-10 mb-3 opacity-30" />
+                  <p className="text-sm">No activity yet</p>
+                  <p className="text-xs mt-1">Actions will appear here as you manage tenants</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-zinc-800/60">
+                  {logs.map(log => (
+                    <div key={log.id} className="px-5 py-3.5 flex items-start gap-3 hover:bg-zinc-800/20 transition-colors">
+                      {/* Icon */}
+                      <div className={`mt-0.5 w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${logIconBg(log.action)}`}>
+                        {logIcon(log.action)}
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-white text-sm font-medium">{logLabel(log.action)}</span>
+                          {log.entity_name && (
+                            <span className="text-zinc-300 text-xs bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-700 truncate max-w-[200px]">
+                              {log.entity_name}
+                            </span>
+                          )}
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${entityTypeColor(log.entity_type)}`}>
+                            {log.entity_type}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 mt-0.5">
+                          <span className="text-zinc-500 text-xs">by {log.performed_by}</span>
+                          {log.details && Object.keys(log.details).length > 0 && (
+                            <span className="text-zinc-600 text-xs truncate hidden sm:block">
+                              {JSON.stringify(log.details).slice(0, 80)}…
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Time */}
+                      <span className="text-zinc-600 text-[11px] shrink-0 mt-0.5">
+                        {new Date(log.created_at).toLocaleString('en-IN', {
+                          day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+                        })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </main>
+
+      {/* ── Delete Confirmation Modal ──────────────────────────────────────── */}
+      {confirmDelete && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl w-full max-w-sm">
+            <div className="px-5 py-4 border-b border-zinc-800 flex items-center gap-3">
+              <div className="w-9 h-9 bg-red-500/10 rounded-full flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-4.5 h-4.5 text-red-400" />
+              </div>
+              <div>
+                <h2 className="text-white font-semibold text-sm">Delete Tenant</h2>
+                <p className="text-zinc-500 text-xs mt-0.5">This action cannot be undone</p>
+              </div>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-zinc-300 text-sm leading-relaxed">
+                You are about to permanently delete{' '}
+                <span className="text-white font-semibold">{confirmDelete.company_name}</span>{' '}
+                and all associated data including{' '}
+                <span className="text-red-400 font-medium">all employees, settings, and records</span>.
+              </p>
+              <div className="bg-red-500/5 border border-red-500/20 rounded-lg p-3">
+                <p className="text-red-400 text-xs font-medium">
+                  Portal URL: {confirmDelete.slug}.hrjo.in will stop working immediately.
+                </p>
+              </div>
+
+              {deleteError && (
+                <div className="bg-red-500/10 border border-red-500/20 rounded p-2.5">
+                  <p className="text-red-400 text-xs">{deleteError}</p>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1 border-zinc-700 text-zinc-300 hover:bg-zinc-800 text-sm"
+                  onClick={() => setConfirmDelete(null)}
+                  disabled={deleting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  disabled={deleting}
+                  onClick={deleteTenant}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm gap-1.5"
+                >
+                  {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Trash2 className="w-3.5 h-3.5" /> Delete Forever</>}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Create Tenant Modal ─────────────────────────────────────────────── */}
       {showCreate && (

@@ -4,6 +4,7 @@ import bcryptjs from 'bcryptjs'
 const bcrypt = (bcryptjs as any).default ?? bcryptjs
 import { getSuperSession } from '@/lib/super-auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { superLog } from '@/lib/super-logger'
 
 // GET — list employees for a tenant
 export async function GET(
@@ -93,6 +94,15 @@ export async function POST(
     console.error('Create employee error:', empErr.message)
     return NextResponse.json({ error: empErr.message || 'Failed to create employee' }, { status: 500 })
   }
+
+  await superLog({
+    action: 'add_employee',
+    entity_type: 'employee',
+    entity_id: params.id,
+    entity_name: email.toLowerCase().trim(),
+    details: { role, employee_code: code, tenant_id: params.id },
+    performed_by: session.email,
+  })
 
   return NextResponse.json({ success: true }, { status: 201 })
 }
