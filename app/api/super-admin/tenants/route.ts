@@ -91,6 +91,9 @@ export async function POST(req: NextRequest) {
   const first_name = nameParts[0] || 'Admin'
   const last_name = nameParts.slice(1).join(' ') || company_name.trim()
 
+  // Generate a tenant-scoped unique employee code for the master admin
+  const adminCode = `${slug.trim().toUpperCase().slice(0, 6)}-ADM`
+
   const { error: empErr } = await supabaseAdmin.from('employees').insert({
     tenant_id: tenant.id,
     first_name,
@@ -99,7 +102,7 @@ export async function POST(req: NextRequest) {
     password_hash,
     role: 'master_admin',
     is_active: true,
-    employee_code: 'ADM001',
+    employee_code: adminCode,
     base_salary: 0,
     mobile: '0000000000',
     address: company_name.trim(),
