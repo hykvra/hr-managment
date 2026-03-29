@@ -22,12 +22,17 @@ const PUBLIC_PATHS = [
 ]
 
 /** Extract tenant slug from subdomain — e.g. esam.hrjo.in → "esam".
- *  Returns '' on the root domain (hrjo.in) — no default tenant. */
-function extractTenantSlug(hostname: string): string {
+ *  Returns '' on the root domain (hrjo.in) — no default tenant.
+ *  Reads x-forwarded-host first (set by Railway/Cloudflare proxy). */
+function extractTenantSlug(req: NextRequest): string {
+  // Railway / Cloudflare proxy forwards the original host here
+  const forwarded = req.headers.get('x-forwarded-host')
+  const hostname = (forwarded ?? req.nextUrl.hostname).split(':')[0].toLowerCase()
+
   const parts = hostname.split('.')
   if (parts.length >= 3 && parts[0] !== 'www') return parts[0]
   // localhost / dev fallback only
-  if (hostname === 'localhost' || hostname.startsWith('localhost:')) {
+  if (hostname === 'localhost' || hostname.startsWith('localhost')) {
     return process.env.NEXT_PUBLIC_DEFAULT_TENANT_SLUG ?? ''
   }
   return ''
@@ -37,7 +42,7 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
 
   // Always inject tenant slug so auth routes (login/register) can resolve it
-  const tenantSlug = extractTenantSlug(req.nextUrl.hostname)
+  const tenantSlug = extractTenantSlug(req)
   const baseHeaders = new Headers(req.headers)
   baseHeaders.set('x-tenant-slug', tenantSlug)
 

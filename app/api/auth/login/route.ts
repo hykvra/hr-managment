@@ -16,8 +16,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Resolve tenant from subdomain slug (injected by middleware)
-    const tenantSlug = req.headers.get('x-tenant-slug') ?? (process.env.NEXT_PUBLIC_DEFAULT_TENANT_SLUG ?? 'esam')
+    const rawSlug = req.headers.get('x-tenant-slug')
+    const tenantSlug = rawSlug && rawSlug.trim() !== '' ? rawSlug.trim() : (process.env.NEXT_PUBLIC_DEFAULT_TENANT_SLUG ?? '')
+    console.log('[login] host:', req.headers.get('host'), '| x-tenant-slug:', rawSlug, '| resolved slug:', tenantSlug)
     const tenantId = await resolveTenantId(tenantSlug)
+    console.log('[login] tenantId:', tenantId)
 
     if (!tenantId) {
       return NextResponse.json({ error: 'Unknown workspace. Check your portal URL.' }, { status: 400 })
