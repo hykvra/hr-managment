@@ -128,6 +128,16 @@ export default function RegisterPage() {
   }
 
   // ── Final submit ───────────────────────────────────────────
+  // Called only from the explicit "Submit Registration" button on step 5.
+  // Never auto-triggered by Enter or navigation.
+  async function handleFinalSubmit() {
+    if (step !== 5) return          // safety guard — should never happen
+    if (uploading) return           // still uploading a photo — wait
+    const valid = await trigger()   // validate all fields before final submit
+    if (!valid) return
+    handleSubmit(onSubmit)()
+  }
+
   async function onSubmit(data: RegisterData) {
     setError('')
     const res = await fetch('/api/auth/register', {
@@ -227,7 +237,8 @@ export default function RegisterPage() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {/* onSubmit is blocked — submission only happens via the explicit button on step 5 */}
+            <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
               {/* ── Step 1: Personal ── */}
               {step === 1 && (
                 <>
@@ -549,12 +560,15 @@ export default function RegisterPage() {
                   </Button>
                 ) : (
                   <Button
-                    type="submit"
+                    type="button"
+                    onClick={handleFinalSubmit}
                     className="flex-1"
                     disabled={isSubmitting || uploading}
                   >
                     {isSubmitting ? (
-                      <><Loader2 className="w-4 h-4 animate-spin" /> Submitting...</>
+                      <><Loader2 className="w-4 h-4 animate-spin mr-1" /> Submitting...</>
+                    ) : uploading ? (
+                      <><Loader2 className="w-4 h-4 animate-spin mr-1" /> Uploading photo...</>
                     ) : (
                       'Submit Registration'
                     )}
