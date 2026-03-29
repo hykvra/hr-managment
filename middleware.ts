@@ -19,11 +19,16 @@ const PUBLIC_PATHS = [
   '/api/auth/reset-password',
 ]
 
-/** Extract tenant slug from subdomain — e.g. esam.hrjo.in → "esam" */
+/** Extract tenant slug from subdomain — e.g. esam.hrjo.in → "esam".
+ *  Returns '' on the root domain (hrjo.in) — no default tenant. */
 function extractTenantSlug(hostname: string): string {
   const parts = hostname.split('.')
   if (parts.length >= 3 && parts[0] !== 'www') return parts[0]
-  return process.env.NEXT_PUBLIC_DEFAULT_TENANT_SLUG ?? 'esam'
+  // localhost / dev fallback only
+  if (hostname === 'localhost' || hostname.startsWith('localhost:')) {
+    return process.env.NEXT_PUBLIC_DEFAULT_TENANT_SLUG ?? ''
+  }
+  return ''
 }
 
 export async function middleware(req: NextRequest) {
@@ -62,6 +67,20 @@ export async function middleware(req: NextRequest) {
   // Public API routes — no auth required
   if (pathname.startsWith('/api/public/')) {
     return NextResponse.next({ request: { headers: baseHeaders } })
+  }
+
+  // Root domain (no tenant) — only marketing/public routes allowed
+  if (!tenantSlug) {
+    if (
+      PUBLIC_PATHS.includes(pathname) ||
+      pathname.startsWith('/_next') ||
+      pathname.startsWith('/favicon') ||
+      pathname.startsWith('/api/public/')
+    ) {
+      return NextResponse.next({ request: { headers: baseHeaders } })
+    }
+    // Any tenant-specific route on root domain → back to homepage
+    return NextResponse.redirect(new URL('/', req.url))
   }
 
   // Allow public paths and static files
