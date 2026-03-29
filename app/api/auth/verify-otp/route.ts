@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { supabaseAdmin } from '@/lib/supabase'
+import { resolveTenantId } from '@/lib/tenant'
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,11 +15,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
     }
 
+    // Resolve tenant from subdomain slug (injected by middleware)
+    const tenantSlug = req.headers.get('x-tenant-slug') ?? (process.env.NEXT_PUBLIC_DEFAULT_TENANT_SLUG ?? 'esam')
+    const tenantId = await resolveTenantId(tenantSlug)
+
     const { data: record, error } = await supabaseAdmin
       .from('otp_store')
       .select('*')
       .eq('email', email.toLowerCase().trim())
       .eq('otp', otp)
+      .eq('tenant_id', tenantId ?? '')
       .single()
 
     if (error || !record) {
@@ -36,6 +42,7 @@ export async function POST(req: NextRequest) {
       .from('employees')
       .update({ password_hash, updated_at: new Date().toISOString() })
       .eq('email', email.toLowerCase().trim())
+      .eq('tenant_id', tenantId ?? '')
 
     await supabaseAdmin.from('otp_store').delete().eq('id', record.id)
 

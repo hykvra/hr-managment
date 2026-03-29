@@ -10,6 +10,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const tenantId = session.tenant_id
+  if (!tenantId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+
   const { searchParams } = new URL(req.url)
   const month = searchParams.get('month') // YYYY-MM-01 — detail mode
 
@@ -24,6 +27,7 @@ export async function GET(req: NextRequest) {
         status, paid_at, notes,
         employees!employee_id(first_name, last_name, employee_code)
       `)
+      .eq('tenant_id', tenantId)
       .eq('month', month)
       .order('employees(first_name)')
 
@@ -34,6 +38,7 @@ export async function GET(req: NextRequest) {
   const { data } = await supabaseAdmin
     .from('payroll_records')
     .select('month, net_salary, gross_salary, status')
+    .eq('tenant_id', tenantId)
     .order('month', { ascending: false })
 
   if (!data) return NextResponse.json({ summary: [] })

@@ -6,6 +6,9 @@ export async function POST(req: Request) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const tenantId = session.tenant_id
+  if (!tenantId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+
   const body = await req.json()
   const { leave_type, leave_date, end_date } = body
 
@@ -23,6 +26,7 @@ export async function POST(req: Request) {
     .from('leave_requests')
     .select('id')
     .eq('employee_id', session.id)
+    .eq('tenant_id', tenantId)
     .eq('leave_date', leave_date)
     .in('status', ['pending', 'approved'])
     .maybeSingle()
@@ -32,6 +36,7 @@ export async function POST(req: Request) {
   }
 
   const { error } = await supabaseAdmin.from('leave_requests').insert({
+    tenant_id: tenantId,
     employee_id: session.id,
     leave_type,
     leave_date,

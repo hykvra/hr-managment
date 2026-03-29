@@ -17,6 +17,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const tenantId = session.tenant_id
+  if (!tenantId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+
   const { searchParams } = new URL(req.url)
   const month = searchParams.get('month') // YYYY-MM
   if (!month || !/^\d{4}-\d{2}$/.test(month)) {
@@ -37,23 +40,27 @@ export async function GET(req: NextRequest) {
     supabaseAdmin
       .from('employees')
       .select('id, first_name, last_name, employee_code, base_salary')
+      .eq('tenant_id', tenantId)
       .eq('is_active', true)
       .not('role', 'in', '("master_admin","attendance")')
       .order('first_name'),
     supabaseAdmin
       .from('attendance')
       .select('employee_id, status')
+      .eq('tenant_id', tenantId)
       .gte('date', firstDay)
       .lte('date', lastDay),
     supabaseAdmin
       .from('salary_advances')
       .select('employee_id, approved_amount, amount')
+      .eq('tenant_id', tenantId)
       .eq('status', 'approved')
       .gte('created_at', firstDay)
       .lte('created_at', lastDay + 'T23:59:59'),
     supabaseAdmin
       .from('payroll_records')
       .select('*')
+      .eq('tenant_id', tenantId)
       .eq('month', firstDay),
   ])
 
@@ -157,6 +164,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const tenantId = session.tenant_id
+  if (!tenantId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+
   const { month, records } = await req.json() as {
     month: string
     records: {
@@ -176,6 +186,7 @@ export async function POST(req: NextRequest) {
   const firstDay = `${month}-01`
 
   const rows = records.map(r => ({
+    tenant_id: tenantId,
     employee_id: r.employee_id,
     month: firstDay,
     days_present: r.days_present,

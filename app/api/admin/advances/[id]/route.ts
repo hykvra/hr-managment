@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 
-async function canManageSalary(role: string, userId: string): Promise<boolean> {
+async function canManageSalary(role: string, userId: string, tenantId: string): Promise<boolean> {
   if (role === 'master_admin') return true
   const { data } = await supabaseAdmin
     .from('admin_permissions')
     .select('can_manage_salary')
     .eq('employee_id', userId)
+    .eq('tenant_id', tenantId)
     .maybeSingle()
   return (data as { can_manage_salary: boolean } | null)?.can_manage_salary === true
 }
@@ -17,7 +18,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (!session || !['master_admin', 'manager'].includes(session.role)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  if (!(await canManageSalary(session.role, session.id))) {
+
+  const tenantId = session.tenant_id
+  if (!tenantId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+
+  if (!(await canManageSalary(session.role, session.id, tenantId))) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
@@ -35,6 +40,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         manager_comment: comment?.trim() || null,
       })
       .eq('id', params.id)
+      .eq('tenant_id', tenantId)
     if (error) return NextResponse.json({ error: 'Failed to approve advance' }, { status: 500 })
   } else if (action === 'reject') {
     const { error } = await supabaseAdmin
@@ -44,6 +50,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         manager_comment: comment?.trim() || null,
       })
       .eq('id', params.id)
+      .eq('tenant_id', tenantId)
     if (error) return NextResponse.json({ error: 'Failed to reject advance' }, { status: 500 })
   } else {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })

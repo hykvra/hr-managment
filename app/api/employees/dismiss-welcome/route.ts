@@ -12,6 +12,7 @@ export async function POST() {
     .from('employees')
     .update({ first_login: false, updated_at: new Date().toISOString() })
     .eq('id', session.id)
+    .eq('tenant_id', session.tenant_id ?? '')
 
   return NextResponse.json({ success: true })
 }

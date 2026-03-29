@@ -5,6 +5,7 @@ import bcryptjs from 'bcryptjs'
 const bcrypt = (bcryptjs as any).default ?? bcryptjs
 import { supabaseAdmin } from '@/lib/supabase'
 import { sendWelcomeEmail } from '@/lib/mailer'
+import { resolveTenantId } from '@/lib/tenant'
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,9 +31,8 @@ export async function POST(req: NextRequest) {
       ifsc,
       branch_name,
       account_holder,
-      // Section 4: Documents (Supabase Storage URLs)
+      // Section 4: Documents (Storage URLs)
       profile_photo,
-      // Section 5: Agreed to terms (optional)
     } = body
 
     // Basic validation
@@ -44,11 +44,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
     }
 
-    // Check email uniqueness
+    // Resolve tenant from subdomain slug (injected by middleware)
+    const tenantSlug = req.headers.get('x-tenant-slug') ?? (process.env.NEXT_PUBLIC_DEFAULT_TENANT_SLUG ?? 'esam')
+    const tenantId = await resolveTenantId(tenantSlug)
+
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Unknown workspace' }, { status: 400 })
+    }
+
+    // Check email uniqueness within tenant
     const { data: existing } = await supabaseAdmin
       .from('employees')
       .select('id')
       .eq('email', email.toLowerCase().trim())
+      .eq('tenant_id', tenantId)
       .maybeSingle()
 
     if (existing) {
@@ -60,6 +69,7 @@ export async function POST(req: NextRequest) {
     const { data: employee, error } = await supabaseAdmin
       .from('employees')
       .insert({
+        tenant_id: tenantId,
         first_name: first_name.trim(),
         last_name: last_name.trim(),
         email: email.toLowerCase().trim(),

@@ -6,6 +6,9 @@ export async function POST(req: Request) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const tenantId = session.tenant_id
+  if (!tenantId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+
   const body = await req.json()
   const { amount, reason } = body
 
@@ -23,6 +26,7 @@ export async function POST(req: Request) {
     .from('employees')
     .select('base_salary')
     .eq('id', session.id)
+    .eq('tenant_id', tenantId)
     .single()
 
   if (!employee) return NextResponse.json({ error: 'Employee not found' }, { status: 404 })
@@ -40,6 +44,7 @@ export async function POST(req: Request) {
     .from('salary_advances')
     .select('id')
     .eq('employee_id', session.id)
+    .eq('tenant_id', tenantId)
     .eq('status', 'pending')
     .maybeSingle()
 
@@ -48,6 +53,7 @@ export async function POST(req: Request) {
   }
 
   const { error } = await supabaseAdmin.from('salary_advances').insert({
+    tenant_id: tenantId,
     employee_id: session.id,
     amount: parsedAmount,
     reason: reason.trim(),

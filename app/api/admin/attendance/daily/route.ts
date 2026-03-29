@@ -10,6 +10,9 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const tenantId = session.tenant_id
+  if (!tenantId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+
   const { searchParams } = new URL(req.url)
   const date = searchParams.get('date')
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -17,10 +20,15 @@ export async function GET(req: Request) {
   }
 
   const [{ data: existing }, { data: leaves }] = await Promise.all([
-    supabaseAdmin.from('attendance').select('employee_id, status').eq('date', date),
+    supabaseAdmin
+      .from('attendance')
+      .select('employee_id, status')
+      .eq('tenant_id', tenantId)
+      .eq('date', date),
     supabaseAdmin
       .from('leave_requests')
       .select('employee_id')
+      .eq('tenant_id', tenantId)
       .eq('status', 'approved')
       .or(`and(leave_date.eq.${date},end_date.is.null),and(leave_date.lte.${date},end_date.gte.${date})`),
   ])
@@ -39,6 +47,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const tenantId = session.tenant_id
+  if (!tenantId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+
   const { date, records } = await req.json() as {
     date: string
     records: { employee_id: string; status: string }[]
@@ -51,7 +62,7 @@ export async function POST(req: Request) {
   const validStatuses = ['Present', 'Absent', 'HalfDay', 'Uninformed', 'DoubleShift', 'ApprovedLeave']
   const rows = records
     .filter(r => r.employee_id && validStatuses.includes(r.status))
-    .map(r => ({ employee_id: r.employee_id, date, status: r.status }))
+    .map(r => ({ tenant_id: tenantId, employee_id: r.employee_id, date, status: r.status }))
 
   if (rows.length === 0) {
     return NextResponse.json({ error: 'No valid records' }, { status: 400 })

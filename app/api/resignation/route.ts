@@ -6,6 +6,9 @@ export async function POST(req: Request) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const tenantId = session.tenant_id
+  if (!tenantId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+
   const { action } = await req.json()
 
   if (action === 'submit') {
@@ -23,6 +26,7 @@ export async function POST(req: Request) {
         last_working_date: lastWorkingDate,
       })
       .eq('id', session.id)
+      .eq('tenant_id', tenantId)
 
     if (error) return NextResponse.json({ error: 'Failed to submit resignation' }, { status: 500 })
   } else if (action === 'withdraw') {
@@ -34,6 +38,7 @@ export async function POST(req: Request) {
         last_working_date: null,
       })
       .eq('id', session.id)
+      .eq('tenant_id', tenantId)
 
     if (error) return NextResponse.json({ error: 'Failed to withdraw resignation' }, { status: 500 })
   } else {

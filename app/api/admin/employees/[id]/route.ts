@@ -9,6 +9,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const tenantId = session.tenant_id
+  if (!tenantId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+
   const body = await req.json()
   const { action } = body
 
@@ -22,9 +25,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       return NextResponse.json({ error: 'Valid base salary is required' }, { status: 400 })
     }
 
+    // Check code uniqueness within this tenant
     const { data: existing } = await supabaseAdmin
       .from('employees')
       .select('id')
+      .eq('tenant_id', tenantId)
       .eq('employee_code', employee_code.trim())
       .neq('id', params.id)
       .maybeSingle()
@@ -44,6 +49,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         joining_date: new Date().toISOString().split('T')[0],
       })
       .eq('id', params.id)
+      .eq('tenant_id', tenantId)
       .select('email, first_name')
       .single()
 
@@ -57,7 +63,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   }
 
   if (action === 'reject') {
-    const { error } = await supabaseAdmin.from('employees').delete().eq('id', params.id)
+    const { error } = await supabaseAdmin
+      .from('employees')
+      .delete()
+      .eq('id', params.id)
+      .eq('tenant_id', tenantId)
     if (error) return NextResponse.json({ error: 'Failed to reject registration' }, { status: 500 })
     return NextResponse.json({ success: true })
   }
@@ -74,6 +84,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       .from('employees')
       .select('base_salary')
       .eq('id', params.id)
+      .eq('tenant_id', tenantId)
       .single()
 
     if (!emp) return NextResponse.json({ error: 'Employee not found' }, { status: 404 })
@@ -84,8 +95,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       supabaseAdmin.from('employees').update({
         base_salary: Number(new_salary),
         increment_message: message?.trim() || null,
-      }).eq('id', params.id),
+      }).eq('id', params.id).eq('tenant_id', tenantId),
       supabaseAdmin.from('salary_history').insert({
+        tenant_id: tenantId,
         employee_id: params.id,
         old_salary: Number(emp.base_salary),
         new_salary: Number(new_salary),
@@ -113,6 +125,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     const [{ error: bonusErr }, { error: msgErr }] = await Promise.all([
       supabaseAdmin.from('bonus_history').insert({
+        tenant_id: tenantId,
         employee_id: params.id,
         amount: Number(amount),
         reason: reason.trim(),
@@ -120,7 +133,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       }),
       supabaseAdmin.from('employees').update({
         bonus_message: `₹${Number(amount).toLocaleString('en-IN')} bonus — ${reason.trim()}`,
-      }).eq('id', params.id),
+      }).eq('id', params.id).eq('tenant_id', tenantId),
     ])
 
     if (bonusErr || msgErr) {
@@ -136,6 +149,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       .from('employees')
       .update({ shift_id: shift_id || null })
       .eq('id', params.id)
+      .eq('tenant_id', tenantId)
 
     if (error) return NextResponse.json({ error: 'Failed to change shift' }, { status: 500 })
     return NextResponse.json({ success: true })
@@ -146,6 +160,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       .from('employees')
       .update({ is_active: false })
       .eq('id', params.id)
+      .eq('tenant_id', tenantId)
 
     if (error) return NextResponse.json({ error: 'Failed to deactivate employee' }, { status: 500 })
     return NextResponse.json({ success: true })
@@ -156,6 +171,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       .from('employees')
       .update({ is_active: true })
       .eq('id', params.id)
+      .eq('tenant_id', tenantId)
 
     if (error) return NextResponse.json({ error: 'Failed to reactivate employee' }, { status: 500 })
     return NextResponse.json({ success: true })

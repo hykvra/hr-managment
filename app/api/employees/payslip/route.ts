@@ -8,9 +8,13 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const tenantId = session.tenant_id
+  if (!tenantId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+
   const { data } = await supabaseAdmin
     .from('payroll_records')
     .select('*')
+    .eq('tenant_id', tenantId)
     .eq('employee_id', session.id)
     .eq('status', 'paid')
     .order('month', { ascending: false })

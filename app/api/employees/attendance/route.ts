@@ -6,6 +6,9 @@ export async function GET(req: Request) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const tenantId = session.tenant_id
+  if (!tenantId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+
   const { searchParams } = new URL(req.url)
   const year = parseInt(searchParams.get('year') || '')
   const month = parseInt(searchParams.get('month') || '')
@@ -21,6 +24,7 @@ export async function GET(req: Request) {
   const { data, error } = await supabaseAdmin
     .from('attendance')
     .select('date, status')
+    .eq('tenant_id', tenantId)
     .eq('employee_id', session.id)
     .gte('date', firstDay)
     .lte('date', lastDay)

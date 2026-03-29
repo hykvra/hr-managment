@@ -13,6 +13,9 @@ export async function PATCH(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const tenantId = session.tenant_id
+  if (!tenantId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+
   const { action } = await req.json() as { action: string }
 
   if (action === 'mark_paid') {
@@ -20,6 +23,7 @@ export async function PATCH(
       .from('payroll_records')
       .update({ status: 'paid', paid_at: new Date().toISOString() })
       .eq('id', params.id)
+      .eq('tenant_id', tenantId)
 
     if (error) return NextResponse.json({ error: 'Failed to update' }, { status: 500 })
     return NextResponse.json({ success: true })

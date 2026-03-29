@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { supabaseAdmin } from '@/lib/supabase'
 import { signToken, setAuthCookie } from '@/lib/auth'
+import { resolveTenantId } from '@/lib/tenant'
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,10 +12,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400 })
     }
 
+    // Resolve tenant from subdomain slug (injected by middleware)
+    const tenantSlug = req.headers.get('x-tenant-slug') ?? (process.env.NEXT_PUBLIC_DEFAULT_TENANT_SLUG ?? 'esam')
+    const tenantId = await resolveTenantId(tenantSlug)
+
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Unknown workspace' }, { status: 400 })
+    }
+
     const { data: employee, error } = await supabaseAdmin
       .from('employees')
       .select('id, email, password_hash, role, shift_id, is_active, first_login')
       .eq('email', email.toLowerCase().trim())
+      .eq('tenant_id', tenantId)
       .single()
 
     if (error || !employee) {
@@ -38,6 +48,7 @@ export async function POST(req: NextRequest) {
       role: employee.role,
       shift_id: employee.shift_id,
       email: employee.email,
+      tenant_id: tenantId,
     })
 
     const cookieOpts = setAuthCookie(token) as {

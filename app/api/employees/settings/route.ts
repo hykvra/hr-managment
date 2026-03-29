@@ -7,6 +7,9 @@ export async function PATCH(req: Request) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const tenantId = session.tenant_id
+  if (!tenantId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+
   const body = await req.json()
   const { tab } = body
 
@@ -17,6 +20,7 @@ export async function PATCH(req: Request) {
       .from('employees')
       .select('password_hash, email')
       .eq('id', session.id)
+      .eq('tenant_id', tenantId)
       .single()
 
     if (!employee) return NextResponse.json({ error: 'Employee not found' }, { status: 404 })
@@ -37,6 +41,7 @@ export async function PATCH(req: Request) {
         .from('employees')
         .update({ password_hash: hash })
         .eq('id', session.id)
+        .eq('tenant_id', tenantId)
       if (error) return NextResponse.json({ error: 'Failed to update password' }, { status: 500 })
     }
 
@@ -45,6 +50,7 @@ export async function PATCH(req: Request) {
         .from('employees')
         .select('id')
         .eq('email', new_email)
+        .eq('tenant_id', tenantId)
         .neq('id', session.id)
         .maybeSingle()
       if (exists) return NextResponse.json({ error: 'Email is already in use' }, { status: 400 })
@@ -52,6 +58,7 @@ export async function PATCH(req: Request) {
         .from('employees')
         .update({ email: new_email })
         .eq('id', session.id)
+        .eq('tenant_id', tenantId)
       if (error) return NextResponse.json({ error: 'Failed to update email' }, { status: 500 })
     }
   } else if (tab === 'contact') {
@@ -60,6 +67,7 @@ export async function PATCH(req: Request) {
       .from('employees')
       .update({ mobile, address, emergency_name, emergency_phone })
       .eq('id', session.id)
+      .eq('tenant_id', tenantId)
     if (error) return NextResponse.json({ error: 'Failed to update contact info' }, { status: 500 })
   } else if (tab === 'bank') {
     const { bank_name, account_no, ifsc, branch_name, account_holder } = body
@@ -67,6 +75,7 @@ export async function PATCH(req: Request) {
       .from('employees')
       .update({ bank_name, account_no, ifsc, branch_name, account_holder })
       .eq('id', session.id)
+      .eq('tenant_id', tenantId)
     if (error) return NextResponse.json({ error: 'Failed to update bank details' }, { status: 500 })
   } else {
     return NextResponse.json({ error: 'Invalid settings tab' }, { status: 400 })

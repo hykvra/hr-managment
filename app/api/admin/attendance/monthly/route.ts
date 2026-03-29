@@ -8,6 +8,9 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const tenantId = session.tenant_id
+  if (!tenantId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+
   const { searchParams } = new URL(req.url)
   const employee_id = searchParams.get('employee_id')
   const year = parseInt(searchParams.get('year') || '')
@@ -25,6 +28,7 @@ export async function GET(req: Request) {
     supabaseAdmin
       .from('attendance')
       .select('date, status')
+      .eq('tenant_id', tenantId)
       .eq('employee_id', employee_id)
       .gte('date', firstDay)
       .lte('date', lastDay),
@@ -32,6 +36,7 @@ export async function GET(req: Request) {
       .from('employees')
       .select('first_name, last_name, employee_code, base_salary, leave_balance')
       .eq('id', employee_id)
+      .eq('tenant_id', tenantId)
       .single(),
   ])
 

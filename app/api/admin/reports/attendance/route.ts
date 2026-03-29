@@ -10,6 +10,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const tenantId = session.tenant_id
+  if (!tenantId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+
   const { searchParams } = new URL(req.url)
   const month = searchParams.get('month') // YYYY-MM
   if (!month || !/^\d{4}-\d{2}$/.test(month)) {
@@ -25,12 +28,14 @@ export async function GET(req: NextRequest) {
     supabaseAdmin
       .from('employees')
       .select('id, first_name, last_name, employee_code, shift_id')
+      .eq('tenant_id', tenantId)
       .eq('is_active', true)
       .not('role', 'in', '("master_admin","attendance")')
       .order('first_name'),
     supabaseAdmin
       .from('attendance')
       .select('employee_id, status')
+      .eq('tenant_id', tenantId)
       .gte('date', firstDay)
       .lte('date', lastDay),
   ])

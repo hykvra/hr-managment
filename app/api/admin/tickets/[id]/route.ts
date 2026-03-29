@@ -8,6 +8,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const tenantId = session.tenant_id
+  if (!tenantId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+
   const { reply } = await req.json()
 
   if (!reply?.trim()) {
@@ -18,6 +21,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     .from('support_tickets')
     .update({ status: 'resolved', manager_reply: reply.trim() })
     .eq('id', params.id)
+    .eq('tenant_id', tenantId)
 
   if (error) return NextResponse.json({ error: 'Failed to resolve ticket' }, { status: 500 })
   return NextResponse.json({ success: true })

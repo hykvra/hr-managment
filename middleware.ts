@@ -16,8 +16,20 @@ const PUBLIC_PATHS = [
   '/api/auth/reset-password',
 ]
 
+/** Extract tenant slug from subdomain — e.g. esam.hrjo.in → "esam" */
+function extractTenantSlug(hostname: string): string {
+  const parts = hostname.split('.')
+  if (parts.length >= 3 && parts[0] !== 'www') return parts[0]
+  return process.env.NEXT_PUBLIC_DEFAULT_TENANT_SLUG ?? 'esam'
+}
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
+
+  // Always inject tenant slug so auth routes (login/register) can resolve it
+  const tenantSlug = extractTenantSlug(req.nextUrl.hostname)
+  const baseHeaders = new Headers(req.headers)
+  baseHeaders.set('x-tenant-slug', tenantSlug)
 
   // Allow public paths and static files
   if (
@@ -25,7 +37,7 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon')
   ) {
-    return NextResponse.next()
+    return NextResponse.next({ request: { headers: baseHeaders } })
   }
 
   const token = req.cookies.get(COOKIE_NAME)?.value
@@ -56,13 +68,17 @@ export async function middleware(req: NextRequest) {
       }
     }
 
-    // Inject user info into request headers for API routes
+    // Inject user + tenant context into request headers for API routes
     const requestHeaders = new Headers(req.headers)
+    requestHeaders.set('x-tenant-slug', tenantSlug)
     requestHeaders.set('x-user-id', payload.id as string)
     requestHeaders.set('x-user-role', role)
     requestHeaders.set('x-user-email', payload.email as string)
     if (payload.shift_id) {
       requestHeaders.set('x-user-shift', payload.shift_id as string)
+    }
+    if (payload.tenant_id) {
+      requestHeaders.set('x-tenant-id', payload.tenant_id as string)
     }
 
     return NextResponse.next({ request: { headers: requestHeaders } })

@@ -5,6 +5,7 @@ export interface JWTPayload {
   role: Role
   shift_id: string | null
   email: string
+  tenant_id: string
 }
 
 export interface Employee {

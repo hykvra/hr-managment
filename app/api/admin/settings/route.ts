@@ -8,6 +8,9 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const tenantId = session.tenant_id
+  if (!tenantId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+
   const { settings } = await req.json() as { settings: Record<string, string> }
 
   if (!settings || typeof settings !== 'object') {
@@ -20,7 +23,10 @@ export async function PATCH(req: Request) {
     if (!validKeys.includes(key)) continue
     const { error } = await supabaseAdmin
       .from('company_settings')
-      .upsert({ setting_key: key, setting_value: String(value) }, { onConflict: 'setting_key' })
+      .upsert(
+        { tenant_id: tenantId, setting_key: key, setting_value: String(value) },
+        { onConflict: 'tenant_id,setting_key' }
+      )
     if (error) return NextResponse.json({ error: `Failed to update ${key}` }, { status: 500 })
   }
 

@@ -8,6 +8,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const tenantId = session.tenant_id
+  if (!tenantId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+
   const body = await req.json()
   const {
     can_approve_leaves,
@@ -22,6 +25,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     .upsert(
       {
         employee_id: params.id,
+        tenant_id: tenantId,
         can_approve_leaves: !!can_approve_leaves,
         can_manage_salary: !!can_manage_salary,
         can_view_reports: !!can_view_reports,

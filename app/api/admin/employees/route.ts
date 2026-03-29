@@ -10,6 +10,9 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const tenantId = session.tenant_id
+  if (!tenantId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+
   const { data, error } = await supabaseAdmin
     .from('employees')
     .select(`
@@ -18,6 +21,7 @@ export async function GET() {
       joining_date, profile_photo, created_at,
       shifts!shift_id(name)
     `)
+    .eq('tenant_id', tenantId)
     .eq('is_active', true)
     .not('role', 'in', '("master_admin")')
     .order('first_name')
