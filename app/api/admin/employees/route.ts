@@ -19,6 +19,7 @@ export async function GET() {
       id, first_name, last_name, email, employee_code, mobile,
       role, is_active, shift_id, base_salary, leave_balance,
       joining_date, profile_photo, created_at,
+      department, employment_type, pf_enabled, esi_enabled,
       shifts!shift_id(name)
     `)
     .eq('tenant_id', tenantId)

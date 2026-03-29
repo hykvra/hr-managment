@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { parseBranding } from '@/lib/branding'
+import { LeaveTypesManager } from './LeaveTypesManager'
+import { HolidayCalendar } from './HolidayCalendar'
 
 type CompanySetting = { setting_key: string; setting_value: string }
 
@@ -264,6 +266,28 @@ export function PolicySettings({ companySettings, managers }: Props) {
             </Button>
             {settingsMsg && <span className="text-green-400 text-xs">{settingsMsg}</span>}
           </div>
+        </div>
+      </div>
+
+      <Separator className="bg-zinc-700" />
+
+      {/* Leave Types */}
+      <div>
+        <p className="text-zinc-300 text-sm font-medium mb-1">Leave Types</p>
+        <p className="text-zinc-500 text-xs mb-3">Define the types of leave available to your employees. Employees can only select from these types when applying for leave.</p>
+        <div className="bg-zinc-800 rounded-lg p-4">
+          <LeaveTypesManager />
+        </div>
+      </div>
+
+      <Separator className="bg-zinc-700" />
+
+      {/* Holiday Calendar */}
+      <div>
+        <p className="text-zinc-300 text-sm font-medium mb-1">Holiday Calendar</p>
+        <p className="text-zinc-500 text-xs mb-3">Add company holidays. Employees cannot apply for leave on these dates — they are automatically treated as paid days off.</p>
+        <div className="bg-zinc-800 rounded-lg p-4">
+          <HolidayCalendar />
         </div>
       </div>
 

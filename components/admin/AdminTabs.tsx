@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Users, CalendarCheck, Banknote, Ticket, Clock, Megaphone, Settings, Wallet, UserCog, BarChart2, CreditCard } from 'lucide-react'
+import { Users, CalendarCheck, Banknote, Ticket, Clock, Megaphone, Settings, Wallet, UserCog, BarChart2, CreditCard, HandCoins, Building2, Receipt, AlertTriangle, Upload, Activity, Star, CalendarDays, LogOut } from 'lucide-react'
 import { EmployeeApprovals } from './EmployeeApprovals'
 import { LeaveManagement } from './LeaveManagement'
 import { AdvanceManagement } from './AdvanceManagement'
@@ -13,6 +13,15 @@ import { PayrollRun } from './PayrollRun'
 import { EmployeeManagement } from './EmployeeManagement'
 import { Reports } from './Reports'
 import { BillingPanel } from './BillingPanel'
+import { LoanManagement } from './LoanManagement'
+import { DepartmentsPanel } from './DepartmentsPanel'
+import { ExpenseManagement } from './ExpenseManagement'
+import { WarningLetters } from './WarningLetters'
+import { BulkImportPanel } from './BulkImportPanel'
+import { ActivityLogViewer } from './ActivityLogViewer'
+import { PerformanceReviews } from './PerformanceReviews'
+import { LeaveBalancesPanel } from './LeaveBalancesPanel'
+import { ResignationManagement } from './ResignationManagement'
 
 // ── Data types ────────────────────────────────────────────────────────────────
 
@@ -78,9 +87,18 @@ const TAB_CONFIG = [
   { id: 'tickets',     label: 'Tickets',    Icon: Ticket,        alwaysManager: true },
   { id: 'shifts',      label: 'Shifts',     Icon: Clock,         perm: 'can_manage_shifts'  },
   { id: 'broadcasts',  label: 'Broadcasts', Icon: Megaphone,     perm: 'can_send_broadcast' },
+  { id: 'loans',       label: 'Loans',      Icon: HandCoins,     masterOnly: true  },
+  { id: 'expenses',    label: 'Expenses',   Icon: Receipt,       perm: 'can_manage_salary' },
+  { id: 'departments', label: 'Departments',Icon: Building2,     masterOnly: true  },
+  { id: 'warnings',      label: 'Warnings',    Icon: AlertTriangle, masterOnly: true  },
+  { id: 'resignations',  label: 'Resignations',Icon: LogOut,        masterOnly: true  },
+  { id: 'import',        label: 'Import',      Icon: Upload,        masterOnly: true  },
   { id: 'payroll',     label: 'Payroll',    Icon: Wallet,        masterOnly: true  },
-  { id: 'reports',     label: 'Reports',    Icon: BarChart2,     masterOnly: true  },
-  { id: 'settings',    label: 'Settings',   Icon: Settings,      masterOnly: true  },
+  { id: 'leave_balances', label: 'Leave Bal',   Icon: CalendarDays,  masterOnly: true  },
+  { id: 'performance',   label: 'Reviews',     Icon: Star,          masterOnly: true  },
+  { id: 'activity_log',  label: 'Audit Log',   Icon: Activity,      masterOnly: true  },
+  { id: 'reports',       label: 'Reports',     Icon: BarChart2,     masterOnly: true  },
+  { id: 'settings',      label: 'Settings',    Icon: Settings,      masterOnly: true  },
   { id: 'billing',     label: 'Billing',    Icon: CreditCard,    masterOnly: true  },
 ] as const
 
@@ -168,6 +186,33 @@ export function AdminTabs({
         )}
         {active === 'broadcasts' && (
           <BroadcastPanel shifts={shifts} recentBroadcasts={recentBroadcasts} />
+        )}
+        {active === 'loans' && (
+          <LoanManagement />
+        )}
+        {active === 'expenses' && (
+          <ExpenseManagement />
+        )}
+        {active === 'departments' && (
+          <DepartmentsPanel />
+        )}
+        {active === 'warnings' && (
+          <WarningLetters />
+        )}
+        {active === 'resignations' && (
+          <ResignationManagement />
+        )}
+        {active === 'import' && (
+          <BulkImportPanel onClose={() => {}} />
+        )}
+        {active === 'leave_balances' && (
+          <LeaveBalancesPanel />
+        )}
+        {active === 'performance' && (
+          <PerformanceReviews />
+        )}
+        {active === 'activity_log' && (
+          <ActivityLogViewer />
         )}
         {active === 'payroll' && (
           <PayrollRun />

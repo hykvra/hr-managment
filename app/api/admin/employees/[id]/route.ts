@@ -201,5 +201,39 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ success: true })
   }
 
+  if (action === 'edit_details') {
+    const { department, employment_type, pf_enabled, esi_enabled } = body
+    const validTypes = ['regular', 'contractual', 'daily_wage']
+    if (employment_type && !validTypes.includes(employment_type)) {
+      return NextResponse.json({ error: 'Invalid employment type' }, { status: 400 })
+    }
+    const updates: Record<string, unknown> = {}
+    if (department !== undefined) updates.department = department?.trim() || null
+    if (employment_type !== undefined) updates.employment_type = employment_type
+    if (typeof pf_enabled === 'boolean') updates.pf_enabled = pf_enabled
+    if (typeof esi_enabled === 'boolean') updates.esi_enabled = esi_enabled
+
+    const { error } = await supabaseAdmin
+      .from('employees')
+      .update(updates)
+      .eq('id', params.id)
+      .eq('tenant_id', tenantId)
+
+    if (error) return NextResponse.json({ error: 'Failed to update employee details' }, { status: 500 })
+
+    await activityLog({
+      action: 'employee_details_updated' as Parameters<typeof activityLog>[0]['action'],
+      tenant_id: tenantId,
+      actor_id: session.id,
+      actor_email: session.email,
+      actor_role: session.role,
+      entity_type: 'employee',
+      entity_id: params.id,
+      details: updates,
+    })
+
+    return NextResponse.json({ success: true })
+  }
+
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
 }

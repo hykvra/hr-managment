@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { activityLog } from '@/lib/activity-logger'
+import { sendLeaveNotificationEmail } from '@/lib/mailer'
 
 async function canApproveLeaves(role: string, userId: string, tenantId: string): Promise<boolean> {
   if (role === 'master_admin') return true
@@ -33,6 +34,16 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
   }
 
+  // Fetch the leave request details
+  const { data: leave } = await supabaseAdmin
+    .from('leave_requests')
+    .select('id, employee_id, leave_date, end_date, leave_type, status, employees(first_name, email)')
+    .eq('id', params.id)
+    .eq('tenant_id', tenantId)
+    .single()
+
+  if (!leave) return NextResponse.json({ error: 'Leave request not found' }, { status: 404 })
+
   const { error } = await supabaseAdmin
     .from('leave_requests')
     .update({
@@ -43,6 +54,69 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     .eq('tenant_id', tenantId)
 
   if (error) return NextResponse.json({ error: 'Failed to update leave' }, { status: 500 })
+
+  // Decrement leave balance if approved
+  if (action === 'approve') {
+    try {
+      // Calculate number of days
+      const start = new Date(leave.leave_date)
+      const end = leave.end_date ? new Date(leave.end_date) : start
+      const days = Math.round((end.getTime() - start.getTime()) / 86400000) + 1
+      const year = start.getFullYear()
+
+      // Try to match leave type to leave_types table
+      const { data: leaveType } = await supabaseAdmin
+        .from('leave_types')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .ilike('name', `%${leave.leave_type}%`)
+        .maybeSingle()
+
+      if (leaveType) {
+        // Read current used, then increment
+        const { data: bal } = await supabaseAdmin
+          .from('employee_leave_balances')
+          .select('id, used')
+          .eq('employee_id', leave.employee_id)
+          .eq('leave_type_id', leaveType.id)
+          .eq('year', year)
+          .maybeSingle()
+
+        if (bal) {
+          await supabaseAdmin
+            .from('employee_leave_balances')
+            .update({ used: Number(bal.used) + days })
+            .eq('id', bal.id)
+        }
+      }
+
+      // Always decrement the legacy leave_balance field too
+      const { data: emp } = await supabaseAdmin
+        .from('employees')
+        .select('leave_balance')
+        .eq('id', leave.employee_id)
+        .single()
+      if (emp && emp.leave_balance !== null) {
+        await supabaseAdmin
+          .from('employees')
+          .update({ leave_balance: Math.max(0, Number(emp.leave_balance) - days) })
+          .eq('id', leave.employee_id)
+      }
+    } catch { /* non-critical */ }
+  }
+
+  // Send notification email (non-blocking)
+  const empData = leave.employees as unknown as { first_name: string; email: string } | null
+  if (empData?.email) {
+    sendLeaveNotificationEmail(
+      empData.email,
+      empData.first_name,
+      action === 'approve' ? 'approved' : 'rejected',
+      leave.leave_type,
+      leave.leave_date,
+      comment,
+    ).catch(() => {})
+  }
 
   await activityLog({
     action: action === 'approve' ? 'leave_approved' : 'leave_rejected',

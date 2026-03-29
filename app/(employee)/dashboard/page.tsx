@@ -8,7 +8,11 @@ import { AttendanceCalendar } from '@/components/employee/AttendanceCalendar'
 import { SalaryEstimateWidget } from '@/components/employee/SalaryEstimateWidget'
 import { HistoryTabs } from '@/components/employee/HistoryTabs'
 import { DashboardActions } from '@/components/employee/DashboardActions'
-import { CalendarDays, Wallet, Clock, FileText } from 'lucide-react'
+import { ClockWidget } from '@/components/employee/ClockWidget'
+import { DocumentsPanel } from '@/components/admin/DocumentsPanel'
+import { EmployeeDirectory } from '@/components/employee/EmployeeDirectory'
+import { IDCardButton } from '@/components/employee/IDCardButton'
+import { CalendarDays, Wallet, Clock, FileText, FolderOpen, Users } from 'lucide-react'
 import { parseBranding } from '@/lib/branding'
 import { getSubscriptionInfo } from '@/lib/subscription'
 
@@ -19,7 +23,7 @@ export default async function EmployeeDashboard() {
   const { data: employee } = await supabaseAdmin
     .from('employees')
     .select(
-      'id, first_name, last_name, email, mobile, address, employee_code, role, shift_id, joining_date, base_salary, leave_balance, profile_photo, first_login, increment_message, bonus_message, total_penalties, resignation_status, resignation_date, last_working_date, emergency_name, emergency_phone, bank_name, account_no, ifsc, branch_name, account_holder'
+      'id, first_name, last_name, email, mobile, address, employee_code, role, shift_id, joining_date, base_salary, leave_balance, profile_photo, first_login, increment_message, bonus_message, total_penalties, resignation_status, resignation_date, last_working_date, emergency_name, emergency_phone, bank_name, account_no, ifsc, branch_name, account_holder, department'
     )
     .eq('id', session.id)
     .single()
@@ -169,9 +173,25 @@ export default async function EmployeeDashboard() {
                     {shift.name} · {shift.start_time} – {shift.end_time}
                   </Badge>
                 )}
+                {employee.department && (
+                  <Badge variant="secondary" className="text-xs">{employee.department}</Badge>
+                )}
                 <Badge variant="secondary" className="text-xs">
                   Joined {new Date(employee.joining_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                 </Badge>
+              </div>
+              <div className="mt-2">
+                <IDCardButton
+                  firstName={employee.first_name}
+                  lastName={employee.last_name}
+                  employeeCode={employee.employee_code}
+                  department={employee.department ?? null}
+                  shiftName={shift?.name ?? null}
+                  joiningDate={employee.joining_date}
+                  profilePhoto={employee.profile_photo}
+                  companyName={branding.name}
+                  companyColor={branding.color}
+                />
               </div>
             </div>
           </CardContent>
@@ -230,6 +250,9 @@ export default async function EmployeeDashboard() {
           </Card>
         </div>
 
+        {/* Clock In / Out */}
+        <ClockWidget />
+
         {/* Calendar + Salary Estimate */}
         <div className="grid md:grid-cols-2 gap-4">
           <AttendanceCalendar
@@ -258,6 +281,30 @@ export default async function EmployeeDashboard() {
           salaryHistory={salaryHistory || []}
           bonusHistory={bonusHistory || []}
         />
+
+        {/* Documents */}
+        <Card className="bg-zinc-900 border-zinc-800">
+          <CardHeader className="pb-2 pt-4 px-4">
+            <CardTitle className="text-sm text-zinc-200 font-semibold flex items-center gap-2">
+              <FolderOpen className="w-4 h-4 text-zinc-400" /> My Documents
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
+            <DocumentsPanel employeeId={employee.id} isOwnProfile={true} />
+          </CardContent>
+        </Card>
+
+        {/* Employee Directory */}
+        <Card className="bg-zinc-900 border-zinc-800">
+          <CardHeader className="pb-2 pt-4 px-4">
+            <CardTitle className="text-sm text-zinc-200 font-semibold flex items-center gap-2">
+              <Users className="w-4 h-4 text-zinc-400" /> Colleague Directory
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
+            <EmployeeDirectory />
+          </CardContent>
+        </Card>
       </main>
     </div>
   )

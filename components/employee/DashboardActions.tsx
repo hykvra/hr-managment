@@ -1,13 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { CalendarDays, Wallet, MessageSquare, LogOut, Settings } from 'lucide-react'
+import { CalendarDays, Wallet, MessageSquare, LogOut, Settings, Receipt, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { LeaveRequestModal } from './LeaveRequestModal'
 import { SalaryAdvanceModal } from './SalaryAdvanceModal'
 import { SupportTicketModal } from './SupportTicketModal'
 import { ResignationModal } from './ResignationModal'
 import { SettingsModal } from './SettingsModal'
+import { ExpenseModal } from './ExpenseModal'
+import { RegularizationModal } from './RegularizationModal'
 
 interface EmployeeSettings {
   email: string
@@ -32,7 +34,7 @@ interface Props {
   lastWorkingDate: string | null
 }
 
-type ModalType = 'leave' | 'advance' | 'ticket' | 'resignation' | 'settings' | null
+type ModalType = 'leave' | 'advance' | 'ticket' | 'resignation' | 'settings' | 'expense' | 'regularize' | null
 
 export function DashboardActions({
   employee, baseSalary, leaveBalance, hasPendingAdvance,
@@ -70,6 +72,22 @@ export function DashboardActions({
           >
             <MessageSquare className="w-3 h-3" /> Ticket
           </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs border-zinc-700 text-zinc-300 hover:text-white gap-1"
+            onClick={() => setOpen('expense')}
+          >
+            <Receipt className="w-3 h-3" /> Expense
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs border-zinc-700 text-zinc-300 hover:text-white gap-1"
+            onClick={() => setOpen('regularize')}
+          >
+            <RefreshCw className="w-3 h-3" /> Regularize
+          </Button>
         </div>
 
         <Button
@@ -102,6 +120,9 @@ export function DashboardActions({
         </Button>
         <Button size="sm" variant="outline" className="flex-1 text-xs border-zinc-700 gap-1" onClick={() => setOpen('ticket')}>
           <MessageSquare className="w-3 h-3" /> Ticket
+        </Button>
+        <Button size="sm" variant="outline" className="flex-1 text-xs border-zinc-700 gap-1" onClick={() => setOpen('expense')}>
+          <Receipt className="w-3 h-3" /> Expense
         </Button>
         <Button
           size="sm"
@@ -152,6 +173,14 @@ export function DashboardActions({
       <SettingsModal
         employee={employee}
         open={open === 'settings'}
+        onClose={() => setOpen(null)}
+      />
+      <ExpenseModal
+        open={open === 'expense'}
+        onClose={() => setOpen(null)}
+      />
+      <RegularizationModal
+        open={open === 'regularize'}
         onClose={() => setOpen(null)}
       />
     </>

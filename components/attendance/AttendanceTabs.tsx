@@ -1,9 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { CalendarDays, BarChart2 } from 'lucide-react'
+import { CalendarDays, BarChart2, Grid3x3, Clock, RefreshCw } from 'lucide-react'
 import { DailySheet } from './DailySheet'
 import { MonthlyReport } from './MonthlyReport'
+import { MusterRoll } from './MusterRoll'
+import { PunchReport } from './PunchReport'
+import { RegularizationManagement } from './RegularizationManagement'
 
 type Employee = {
   id: string
@@ -24,8 +27,11 @@ interface Props {
 }
 
 const TABS = [
-  { id: 'daily',   label: 'Daily Sheet',    Icon: CalendarDays },
-  { id: 'monthly', label: 'Monthly Report', Icon: BarChart2 },
+  { id: 'daily',        label: 'Daily Sheet',    Icon: CalendarDays },
+  { id: 'monthly',      label: 'Monthly Report', Icon: BarChart2    },
+  { id: 'muster',       label: 'Muster Roll',    Icon: Grid3x3      },
+  { id: 'punch',        label: 'Punch Report',   Icon: Clock        },
+  { id: 'regularize',   label: 'Regularizations',Icon: RefreshCw   },
 ] as const
 
 type TabId = (typeof TABS)[number]['id']
@@ -75,6 +81,15 @@ export function AttendanceTabs({
         )}
         {active === 'monthly' && (
           <MonthlyReport employees={employees} />
+        )}
+        {active === 'muster' && (
+          <MusterRoll />
+        )}
+        {active === 'punch' && (
+          <PunchReport />
+        )}
+        {active === 'regularize' && (
+          <RegularizationManagement />
         )}
       </div>
     </div>

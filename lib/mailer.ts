@@ -46,6 +46,121 @@ export async function sendWelcomeEmail(email: string, name: string): Promise<voi
   })
 }
 
+// ── Payslip Email ─────────────────────────────────────────────────────────────
+
+type PayslipRecord = {
+  month: string
+  base_salary: number
+  days_present: number; days_half: number; days_double: number
+  days_absent: number; days_uninformed: number; days_leave: number
+  payable_days: number
+  gross_salary: number
+  total_allowances?: number
+  penalty_deduction: number
+  advance_deduction: number
+  loan_deduction?: number
+  total_component_deductions?: number
+  pf_employee?: number
+  esi_employee?: number
+  pf_employer?: number
+  ot_pay?: number
+  bonus: number
+  net_salary: number
+  notes?: string | null
+}
+
+const MONTH_NAMES = [
+  'January','February','March','April','May','June',
+  'July','August','September','October','November','December',
+]
+
+function fmtINR(n: number) { return '₹' + Math.round(n).toLocaleString('en-IN') }
+
+function payslipRow(label: string, value: string, color = '#a1a1aa') {
+  return `<tr>
+    <td style="padding:4px 0;color:#a1a1aa;font-size:13px;border-bottom:1px solid #3f3f46">${label}</td>
+    <td style="padding:4px 0;text-align:right;font-size:13px;font-weight:600;color:${color};border-bottom:1px solid #3f3f46">${value}</td>
+  </tr>`
+}
+
+export async function sendPayslipEmail(
+  email: string,
+  firstName: string,
+  r: PayslipRecord,
+): Promise<void> {
+  const d = new Date(r.month)
+  const monthLabel = `${MONTH_NAMES[d.getUTCMonth()]} ${d.getUTCFullYear()}`
+
+  const earningsSection = [
+    payslipRow('Gross Salary', fmtINR(r.gross_salary), '#fafafa'),
+    (r.total_allowances || 0) > 0
+      ? payslipRow('Allowances (HRA, TA…)', `+${fmtINR(r.total_allowances!)}`, '#4ade80') : '',
+    (r.ot_pay || 0) > 0
+      ? payslipRow('Overtime Pay',          `+${fmtINR(r.ot_pay!)}`,          '#4ade80') : '',
+    r.bonus > 0
+      ? payslipRow('Bonus',                 `+${fmtINR(r.bonus)}`,            '#4ade80') : '',
+  ].join('')
+
+  const deductSection = [
+    r.penalty_deduction > 0
+      ? payslipRow('Uninformed Penalty',  `−${fmtINR(r.penalty_deduction)}`,         '#f87171') : '',
+    r.advance_deduction > 0
+      ? payslipRow('Advance Deduction',   `−${fmtINR(r.advance_deduction)}`,         '#fbbf24') : '',
+    (r.loan_deduction || 0) > 0
+      ? payslipRow('Loan EMI',            `−${fmtINR(r.loan_deduction!)}`,           '#f87171') : '',
+    (r.total_component_deductions || 0) > 0
+      ? payslipRow('Other Deductions',    `−${fmtINR(r.total_component_deductions!)}`, '#f87171') : '',
+    (r.pf_employee || 0) > 0
+      ? payslipRow('PF (Employee 12%)',   `−${fmtINR(r.pf_employee!)}`,             '#94a3b8') : '',
+    (r.esi_employee || 0) > 0
+      ? payslipRow('ESI (Employee 0.75%)',`−${fmtINR(r.esi_employee!)}`,            '#94a3b8') : '',
+  ].join('')
+
+  const html = `
+<div style="font-family:sans-serif;max-width:520px;margin:0 auto;background:#18181b;color:#fafafa;border-radius:12px;padding:32px;">
+  <h2 style="margin:0 0 4px;color:#3b82f6;font-size:20px;">Salary Payslip</h2>
+  <p style="color:#a1a1aa;margin:0 0 24px;font-size:13px;">Hi ${firstName}, here is your payslip for <strong style="color:#fafafa">${monthLabel}</strong>.</p>
+
+  <div style="background:#27272a;border-radius:8px;padding:16px;margin-bottom:12px;">
+    <p style="color:#71717a;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 10px">Attendance</p>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+      <div style="background:#3f3f46;border-radius:6px;padding:8px;text-align:center">
+        <div style="font-size:10px;color:#71717a;margin-bottom:2px">Present</div>
+        <div style="font-weight:bold;font-size:16px">${r.days_present}</div>
+      </div>
+      <div style="background:#3f3f46;border-radius:6px;padding:8px;text-align:center">
+        <div style="font-size:10px;color:#71717a;margin-bottom:2px">Payable Days</div>
+        <div style="font-weight:bold;font-size:16px">${r.payable_days}</div>
+      </div>
+      <div style="background:#3f3f46;border-radius:6px;padding:8px;text-align:center">
+        <div style="font-size:10px;color:#71717a;margin-bottom:2px">Base Salary</div>
+        <div style="font-weight:bold;font-size:14px">${fmtINR(r.base_salary)}</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="background:#27272a;border-radius:8px;padding:16px;margin-bottom:12px;">
+    <p style="color:#71717a;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 10px">Earnings &amp; Deductions</p>
+    <table style="width:100%;border-collapse:collapse">${earningsSection}${deductSection}</table>
+  </div>
+
+  <div style="background:#2563eb;border-radius:8px;padding:20px;text-align:center;margin-bottom:16px;">
+    <p style="color:#bfdbfe;margin:0 0 4px;font-size:12px;">Net Pay for ${monthLabel}</p>
+    <p style="font-size:30px;font-weight:bold;color:#fff;margin:0;">${fmtINR(r.net_salary)}</p>
+  </div>
+
+  ${r.notes ? `<p style="color:#71717a;font-size:12px;margin:0 0 12px">📝 ${r.notes}</p>` : ''}
+  <p style="color:#52525b;font-size:11px;margin:0;">System-generated payslip from ESAM HR Portal. Contact HR for queries.</p>
+</div>`
+
+  await getResend().emails.send({
+    from: getFrom(),
+    to: email,
+    subject: `Your Payslip for ${monthLabel} — ESAM HR`,
+    html,
+  })
+}
+
 export async function sendTenantWelcomeEmail(
   email: string,
   adminName: string,
@@ -81,4 +196,76 @@ export async function sendTenantWelcomeEmail(
       </div>
     `,
   })
+}
+
+// ── Leave Notification Email ───────────────────────────────────────────────────
+
+export async function sendLeaveNotificationEmail(
+  email: string,
+  name: string,
+  action: 'approved' | 'rejected',
+  leaveType: string,
+  leaveDate: string,
+  comment?: string | null,
+): Promise<void> {
+  const isApproved = action === 'approved'
+  const color = isApproved ? '#22c55e' : '#ef4444'
+  const label = isApproved ? 'Approved ✓' : 'Rejected ✗'
+  try {
+    await getResend().emails.send({
+      from: getFrom(),
+      to: email,
+      subject: `Leave ${label} — ${leaveType}`,
+      html: `
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#18181b;color:#fafafa;border-radius:12px;">
+          <h2 style="margin:0 0 8px;color:${color};">Leave ${label}</h2>
+          <p style="color:#a1a1aa;margin:0 0 16px;">Hi ${name}, your leave request has been <strong style="color:${color}">${action}</strong>.</p>
+          <div style="background:#27272a;padding:16px;border-radius:8px;margin-bottom:16px;">
+            <div style="margin-bottom:8px;"><span style="color:#71717a;font-size:12px;">Leave Type</span><br><span style="color:#fafafa;">${leaveType}</span></div>
+            <div><span style="color:#71717a;font-size:12px;">Date</span><br><span style="color:#fafafa;">${new Date(leaveDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span></div>
+          </div>
+          ${comment ? `<p style="color:#a1a1aa;font-size:13px;border-left:3px solid ${color};padding-left:12px;margin:0 0 16px;">${comment}</p>` : ''}
+          <p style="color:#71717a;font-size:12px;margin:0;">ESAM HR Portal</p>
+        </div>
+      `,
+    })
+  } catch (e) {
+    console.error('[mailer] sendLeaveNotificationEmail failed:', e)
+  }
+}
+
+// ── Advance Notification Email ────────────────────────────────────────────────
+
+export async function sendAdvanceNotificationEmail(
+  email: string,
+  name: string,
+  action: 'approved' | 'rejected',
+  requestedAmount: number,
+  approvedAmount?: number | null,
+  comment?: string | null,
+): Promise<void> {
+  const isApproved = action === 'approved'
+  const color = isApproved ? '#22c55e' : '#ef4444'
+  const label = isApproved ? 'Approved ✓' : 'Rejected ✗'
+  try {
+    await getResend().emails.send({
+      from: getFrom(),
+      to: email,
+      subject: `Salary Advance ${label}`,
+      html: `
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#18181b;color:#fafafa;border-radius:12px;">
+          <h2 style="margin:0 0 8px;color:${color};">Salary Advance ${label}</h2>
+          <p style="color:#a1a1aa;margin:0 0 16px;">Hi ${name}, your salary advance request has been <strong style="color:${color}">${action}</strong>.</p>
+          <div style="background:#27272a;padding:16px;border-radius:8px;margin-bottom:16px;">
+            <div style="margin-bottom:8px;"><span style="color:#71717a;font-size:12px;">Requested</span><br><span style="color:#fafafa;">₹${Math.round(requestedAmount).toLocaleString('en-IN')}</span></div>
+            ${isApproved && approvedAmount ? `<div><span style="color:#71717a;font-size:12px;">Approved Amount</span><br><span style="color:#22c55e;font-size:18px;font-weight:700;">₹${Math.round(approvedAmount).toLocaleString('en-IN')}</span></div>` : ''}
+          </div>
+          ${comment ? `<p style="color:#a1a1aa;font-size:13px;border-left:3px solid ${color};padding-left:12px;margin:0 0 16px;">${comment}</p>` : ''}
+          <p style="color:#71717a;font-size:12px;margin:0;">ESAM HR Portal</p>
+        </div>
+      `,
+    })
+  } catch (e) {
+    console.error('[mailer] sendAdvanceNotificationEmail failed:', e)
+  }
 }

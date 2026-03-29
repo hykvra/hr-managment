@@ -13,6 +13,9 @@ type PayrollRecord = {
   last_name: string
   employee_code: string | null
   base_salary: number
+  employment_type: string
+  pf_enabled: boolean
+  esi_enabled: boolean
   days_present: number
   days_half: number
   days_double: number
@@ -21,8 +24,17 @@ type PayrollRecord = {
   days_leave: number
   payable_days: number
   gross_salary: number
+  total_allowances: number
+  total_component_deductions: number
   penalty_deduction: number
   advance_deduction: number
+  pf_employee: number
+  pf_employer: number
+  esi_employee: number
+  esi_employer: number
+  loan_deduction: number
+  ot_hours: number
+  ot_pay: number
   bonus: number
   net_salary: number
   status: string
@@ -77,8 +89,15 @@ function buildPayslipHtml(r: PayrollRecord, month: string): string {
     '</div>',
     '<div class="row"><span class="label">Payable Days</span><span>' + r.payable_days + '</span></div>',
     '<div class="row"><span class="label">Gross Salary</span><span>₹' + Math.round(r.gross_salary).toLocaleString('en-IN') + '</span></div>',
+    r.total_allowances > 0 ? '<div class="row"><span class="label">Total Allowances (HRA, TA, etc.)</span><span style="color:#16a34a">+₹' + Math.round(r.total_allowances).toLocaleString('en-IN') + '</span></div>' : '',
+    r.ot_pay > 0 ? '<div class="row"><span class="label">Overtime Pay (' + r.ot_hours + ' hrs)</span><span style="color:#16a34a">+₹' + Math.round(r.ot_pay).toLocaleString('en-IN') + '</span></div>' : '',
     r.penalty_deduction > 0 ? '<div class="row"><span class="label">Uninformed Penalty</span><span style="color:#dc2626">−₹' + Math.round(r.penalty_deduction).toLocaleString('en-IN') + '</span></div>' : '',
     r.advance_deduction > 0 ? '<div class="row"><span class="label">Advance Deduction</span><span style="color:#d97706">−₹' + Math.round(r.advance_deduction).toLocaleString('en-IN') + '</span></div>' : '',
+    r.loan_deduction > 0 ? '<div class="row"><span class="label">Loan EMI</span><span style="color:#dc2626">−₹' + Math.round(r.loan_deduction).toLocaleString('en-IN') + '</span></div>' : '',
+    r.total_component_deductions > 0 ? '<div class="row"><span class="label">Other Deductions</span><span style="color:#dc2626">−₹' + Math.round(r.total_component_deductions).toLocaleString('en-IN') + '</span></div>' : '',
+    r.pf_employee > 0 ? '<div class="row"><span class="label">PF (Employee 12%)</span><span style="color:#dc2626">−₹' + Math.round(r.pf_employee).toLocaleString('en-IN') + '</span></div>' : '',
+    r.esi_employee > 0 ? '<div class="row"><span class="label">ESI (Employee 0.75%)</span><span style="color:#dc2626">−₹' + Math.round(r.esi_employee).toLocaleString('en-IN') + '</span></div>' : '',
+    r.pf_employer > 0 ? '<div class="row"><span class="label">PF (Employer 12%)</span><span style="color:#6b7280;font-size:10px">₹' + Math.round(r.pf_employer).toLocaleString('en-IN') + ' (info only)</span></div>' : '',
     r.bonus > 0 ? '<div class="row"><span class="label">Bonus</span><span style="color:#16a34a">+₹' + Math.round(r.bonus).toLocaleString('en-IN') + '</span></div>' : '',
     '<div class="net-box">Net Pay: ₹' + Math.round(r.net_salary).toLocaleString('en-IN') + '</div>',
     r.notes ? '<div class="row"><span class="label">Notes</span><span>' + r.notes + '</span></div>' : '',
@@ -105,7 +124,7 @@ export function PayrollRun() {
   const [year, setYear] = useState(now.getFullYear())
   const [mon, setMon] = useState(now.getMonth() + 1)
   const [records, setRecords] = useState<PayrollRecord[]>([])
-  const [adjustments, setAdjustments] = useState<Record<string, { bonus: string; notes: string }>>({})
+  const [adjustments, setAdjustments] = useState<Record<string, { bonus: string; ot_hours: string; notes: string }>>({})
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [markingId, setMarkingId] = useState<string | null>(null)
@@ -128,11 +147,12 @@ export function PayrollRun() {
       if (res.ok) {
         const { records: data } = await res.json() as { records: PayrollRecord[] }
         setRecords(data)
-        const adj: Record<string, { bonus: string; notes: string }> = {}
+        const adj: Record<string, { bonus: string; ot_hours: string; notes: string }> = {}
         for (const r of data) {
           adj[r.employee_id] = {
-            bonus: r.bonus > 0 ? String(r.bonus) : '',
-            notes: r.notes || '',
+            bonus:    r.bonus    > 0 ? String(r.bonus)    : '',
+            ot_hours: r.ot_hours > 0 ? String(r.ot_hours) : '',
+            notes:    r.notes || '',
           }
         }
         setAdjustments(adj)
@@ -144,10 +164,22 @@ export function PayrollRun() {
   }
 
   function getAdjustedRecord(r: PayrollRecord): PayrollRecord {
-    const adj = adjustments[r.employee_id] || { bonus: '', notes: '' }
-    const bonus = Number(adj.bonus) || 0
-    const net = Math.max(0, r.gross_salary - r.penalty_deduction - r.advance_deduction + bonus)
-    return { ...r, bonus, net_salary: Math.round(net * 100) / 100, notes: adj.notes || null }
+    const adj      = adjustments[r.employee_id] || { bonus: '', ot_hours: '', notes: '' }
+    const bonus    = Number(adj.bonus)    || 0
+    const otHours  = Number(adj.ot_hours) || 0
+    const otPay    = Math.round(otHours * (r.base_salary / 30 / 8) * 2 * 100) / 100
+    const net = Math.max(0, Math.round((
+      r.gross_salary
+      + (r.total_allowances || 0)
+      - r.penalty_deduction
+      - r.advance_deduction
+      - (r.loan_deduction   || 0)
+      - (r.total_component_deductions || 0)
+      - (r.pf_employee  || 0)
+      - (r.esi_employee || 0)
+      + bonus + otPay
+    ) * 100) / 100)
+    return { ...r, bonus, ot_hours: otHours, ot_pay: otPay, net_salary: net, notes: adj.notes || null }
   }
 
   async function savePayroll() {
@@ -241,7 +273,7 @@ export function PayrollRun() {
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-zinc-800">
-                {['Employee','P','H','D','U','L','A','Base','Payable','Gross','Penalty','Advance','Bonus','Net','Status',''].map(h => (
+                {['Employee','Type','P','H','D','U','L','A','Base','Payable','Gross','+Allow','Penalty','Advance','Loan','−Deduct','PF','ESI','OT hrs','OT Pay','Bonus','Net','Status',''].map(h => (
                   <th key={h} className="text-left text-zinc-500 font-medium pb-2 pr-3 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -256,6 +288,11 @@ export function PayrollRun() {
                       <span className="text-white font-medium">{r.first_name} {r.last_name}</span>
                       {r.employee_code && <span className="text-zinc-500 ml-1 font-mono">#{r.employee_code}</span>}
                     </td>
+                    <td className="py-2 pr-3">
+                      <span className={`text-[9px] px-1 py-0.5 rounded border ${r.employment_type === 'contractual' ? 'text-purple-400 border-purple-500/30 bg-purple-500/10' : r.employment_type === 'daily_wage' ? 'text-orange-400 border-orange-500/30 bg-orange-500/10' : 'text-zinc-400 border-zinc-600 bg-zinc-700'}`}>
+                        {r.employment_type === 'daily_wage' ? 'Daily' : r.employment_type === 'contractual' ? 'Contract' : 'Regular'}
+                      </span>
+                    </td>
                     <td className="py-2 pr-3 text-green-400">{r.days_present}</td>
                     <td className="py-2 pr-3 text-yellow-400">{r.days_half}</td>
                     <td className="py-2 pr-3 text-blue-400">{r.days_double}</td>
@@ -265,8 +302,30 @@ export function PayrollRun() {
                     <td className="py-2 pr-3 text-zinc-300">{fmtMoney(r.base_salary)}</td>
                     <td className="py-2 pr-3 text-zinc-300">{adj.payable_days}</td>
                     <td className="py-2 pr-3 text-zinc-300">{fmtMoney(adj.gross_salary)}</td>
+                    <td className="py-2 pr-3 text-green-400">{adj.total_allowances > 0 ? `+${fmtMoney(adj.total_allowances)}` : '—'}</td>
                     <td className="py-2 pr-3 text-red-400">{adj.penalty_deduction > 0 ? `−${fmtMoney(adj.penalty_deduction)}` : '—'}</td>
                     <td className="py-2 pr-3 text-yellow-400">{adj.advance_deduction > 0 ? `−${fmtMoney(adj.advance_deduction)}` : '—'}</td>
+                    <td className="py-2 pr-3 text-orange-400">{adj.loan_deduction > 0 ? `−${fmtMoney(adj.loan_deduction)}` : '—'}</td>
+                    <td className="py-2 pr-3 text-red-400">{adj.total_component_deductions > 0 ? `−${fmtMoney(adj.total_component_deductions)}` : '—'}</td>
+                    <td className="py-2 pr-3 text-blue-400">{adj.pf_employee > 0 ? `−${fmtMoney(adj.pf_employee)}` : '—'}</td>
+                    <td className="py-2 pr-3 text-purple-400">{adj.esi_employee > 0 ? `−${fmtMoney(adj.esi_employee)}` : '—'}</td>
+                    {/* OT Hours */}
+                    <td className="py-2 pr-3">
+                      {isPaid ? (
+                        <span className="text-zinc-400">{adj.ot_hours > 0 ? `${adj.ot_hours}h` : '—'}</span>
+                      ) : (
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          value={adjustments[r.employee_id]?.ot_hours || ''}
+                          onChange={e => setAdjustments(a => ({ ...a, [r.employee_id]: { ...a[r.employee_id], ot_hours: e.target.value } }))}
+                          className="h-6 w-16 text-xs bg-zinc-700 border-zinc-600 text-white p-1"
+                        />
+                      )}
+                    </td>
+                    {/* OT Pay */}
+                    <td className="py-2 pr-3 text-green-400">{adj.ot_pay > 0 ? `+${fmtMoney(adj.ot_pay)}` : '—'}</td>
+                    {/* Bonus */}
                     <td className="py-2 pr-3">
                       {isPaid ? (
                         <span className="text-green-400">{adj.bonus > 0 ? `+${fmtMoney(adj.bonus)}` : '—'}</span>

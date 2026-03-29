@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { CalendarDays } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,16 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 
+type LeaveTypeOption = { id: string; name: string; color: string; annual_quota: number }
+
+// Fallback if tenant has no custom leave types configured yet
+const FALLBACK_TYPES: LeaveTypeOption[] = [
+  { id: 'Sick',     name: 'Sick Leave',            color: '#ef4444', annual_quota: 12 },
+  { id: 'Casual',   name: 'Casual Leave',           color: '#f59e0b', annual_quota: 12 },
+  { id: 'Earned',   name: 'Earned Leave',           color: '#10b981', annual_quota: 15 },
+  { id: 'Vacation', name: 'Vacation (Multi-day)',   color: '#3b82f6', annual_quota: 10 },
+]
+
 interface Props {
   leaveBalance: number
   open: boolean
@@ -21,19 +31,34 @@ interface Props {
 
 export function LeaveRequestModal({ leaveBalance, open, onClose }: Props) {
   const router = useRouter()
+  const [leaveTypes, setLeaveTypes] = useState<LeaveTypeOption[]>(FALLBACK_TYPES)
   const [leaveType, setLeaveType] = useState('')
   const [leaveDate, setLeaveDate] = useState('')
   const [endDate, setEndDate] = useState('')
-  const [isVacation, setIsVacation] = useState(false)
+  const [isMultiDay, setIsMultiDay] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
 
   const today = new Date().toISOString().split('T')[0]
 
+  // Fetch custom leave types when modal opens
+  useEffect(() => {
+    if (!open) return
+    fetch('/api/admin/leave-types')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        const types = data?.leave_types?.filter((lt: LeaveTypeOption & { is_active?: boolean }) => lt.is_active !== false)
+        if (types && types.length > 0) setLeaveTypes(types)
+        else setLeaveTypes(FALLBACK_TYPES)
+      })
+      .catch(() => setLeaveTypes(FALLBACK_TYPES))
+  }, [open])
+
   function handleTypeChange(val: string) {
     setLeaveType(val)
-    setIsVacation(val === 'Vacation')
+    // Multi-day for any type if user selects it — the type name doesn't gate it anymore
+    setIsMultiDay(false)
     setEndDate('')
     setError('')
   }
@@ -42,7 +67,7 @@ export function LeaveRequestModal({ leaveBalance, open, onClose }: Props) {
     setLeaveType('')
     setLeaveDate('')
     setEndDate('')
-    setIsVacation(false)
+    setIsMultiDay(false)
     setError('')
     setSuccess(false)
     onClose()
@@ -56,11 +81,11 @@ export function LeaveRequestModal({ leaveBalance, open, onClose }: Props) {
       setError('Please fill in all required fields')
       return
     }
-    if (isVacation && !endDate) {
-      setError('End date is required for vacation leave')
+    if (isMultiDay && !endDate) {
+      setError('End date is required for multi-day leave')
       return
     }
-    if (isVacation && endDate <= leaveDate) {
+    if (isMultiDay && endDate <= leaveDate) {
       setError('End date must be after start date')
       return
     }
@@ -70,10 +95,10 @@ export function LeaveRequestModal({ leaveBalance, open, onClose }: Props) {
       const res = await fetch('/api/leaves', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+body: JSON.stringify({
           leave_type: leaveType,
           leave_date: leaveDate,
-          end_date: isVacation ? endDate : null,
+          end_date: isMultiDay ? endDate : null,
         }),
       })
       const data = await res.json()
@@ -118,17 +143,22 @@ export function LeaveRequestModal({ leaveBalance, open, onClose }: Props) {
                   <SelectValue placeholder="Select leave type" />
                 </SelectTrigger>
                 <SelectContent className="bg-zinc-800 border-zinc-700">
-                  <SelectItem value="Sick" className="text-zinc-200">Sick Leave</SelectItem>
-                  <SelectItem value="Casual" className="text-zinc-200">Casual Leave</SelectItem>
-                  <SelectItem value="Earned" className="text-zinc-200">Earned Leave</SelectItem>
-                  <SelectItem value="Vacation" className="text-zinc-200">Vacation (Multi-day)</SelectItem>
+                  {leaveTypes.map(lt => (
+                    <SelectItem key={lt.id} value={lt.name} className="text-zinc-200">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full inline-block shrink-0" style={{ backgroundColor: lt.color }} />
+                        {lt.name}
+                        <span className="text-zinc-500 text-xs">({lt.annual_quota} days/yr)</span>
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-1.5">
               <Label className="text-zinc-300 text-sm">
-                {isVacation ? 'Start Date *' : 'Date *'}
+                {isMultiDay ? 'Start Date *' : 'Date *'}
               </Label>
               <Input
                 type="date"
@@ -139,7 +169,17 @@ export function LeaveRequestModal({ leaveBalance, open, onClose }: Props) {
               />
             </div>
 
-            {isVacation && (
+            {/* Multi-day toggle */}
+            {leaveDate && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={isMultiDay}
+                  onChange={e => { setIsMultiDay(e.target.checked); setEndDate('') }}
+                  className="w-4 h-4 accent-blue-500" />
+                <span className="text-zinc-300 text-sm">Multi-day leave</span>
+              </label>
+            )}
+
+            {isMultiDay && (
               <div className="space-y-1.5">
                 <Label className="text-zinc-300 text-sm">End Date *</Label>
                 <Input

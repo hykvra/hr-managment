@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { AdminTabs } from '@/components/admin/AdminTabs'
+import { CelebrationsWidget } from '@/components/admin/CelebrationsWidget'
 import { Users, CalendarCheck, Banknote, Ticket, Clock, ArrowRight } from 'lucide-react'
 import { parseBranding } from '@/lib/branding'
 import { getSubscriptionInfo } from '@/lib/subscription'
@@ -84,6 +85,45 @@ export default async function AdminDashboard() {
   ])
 
   const branding = parseBranding(companySettings || [])
+
+  // Celebrations (non-critical — fail silently)
+  type CelebrationAlert = {
+    type: 'birthday' | 'anniversary'; employee_id: string; first_name: string; last_name: string
+    employee_code: string | null; profile_photo: string | null; days_away: number; years?: number
+  }
+  let celebrationsToday: CelebrationAlert[] = []
+  let celebrationsUpcoming: CelebrationAlert[] = []
+  try {
+    const { data: empList } = await supabaseAdmin
+      .from('employees')
+      .select('id, first_name, last_name, employee_code, dob, joining_date, profile_photo')
+      .eq('tenant_id', tid)
+      .eq('is_active', true)
+      .not('role', 'in', '("master_admin","attendance")')
+
+    const today = new Date()
+    const alerts: CelebrationAlert[] = []
+    for (const emp of empList || []) {
+      if (emp.dob) {
+        const dob = new Date(emp.dob)
+        const bd = new Date(today.getFullYear(), dob.getMonth(), dob.getDate())
+        if (bd < today) bd.setFullYear(today.getFullYear() + 1)
+        const diff = Math.round((bd.getTime() - today.getTime()) / 86400000)
+        if (diff <= 30) alerts.push({ type: 'birthday', employee_id: emp.id, first_name: emp.first_name, last_name: emp.last_name, employee_code: emp.employee_code, profile_photo: emp.profile_photo, days_away: diff })
+      }
+      if (emp.joining_date) {
+        const jd = new Date(emp.joining_date)
+        const ann = new Date(today.getFullYear(), jd.getMonth(), jd.getDate())
+        if (ann < today) ann.setFullYear(today.getFullYear() + 1)
+        const diff = Math.round((ann.getTime() - today.getTime()) / 86400000)
+        const years = ann.getFullYear() - jd.getFullYear()
+        if (diff <= 30 && years > 0) alerts.push({ type: 'anniversary', employee_id: emp.id, first_name: emp.first_name, last_name: emp.last_name, employee_code: emp.employee_code, profile_photo: emp.profile_photo, days_away: diff, years })
+      }
+    }
+    alerts.sort((a, b) => a.days_away - b.days_away)
+    celebrationsToday = alerts.filter(a => a.days_away === 0)
+    celebrationsUpcoming = alerts.filter(a => a.days_away > 0)
+  } catch { /* non-critical */ }
 
   const stats = [
     { label: 'Pending Registrations', value: pendingRegCount ?? 0,    icon: Users,         color: 'text-yellow-400', bg: 'bg-yellow-500/10' },
@@ -170,6 +210,9 @@ export default async function AdminDashboard() {
             </Card>
           ))}
         </div>
+
+        {/* Celebrations */}
+        <CelebrationsWidget today={celebrationsToday} upcoming={celebrationsUpcoming} />
 
         {/* Main tabbed interface */}
         <Card className="bg-zinc-900 border-zinc-800">

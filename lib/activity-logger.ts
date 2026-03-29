@@ -43,6 +43,18 @@ export type ActivityAction =
   // ── Resignation ──────────────────────────────────────────────────────────
   | 'resignation_submitted'
   | 'resignation_withdrawn'
+  // ── Employee details ──────────────────────────────────────────────────────
+  | 'employee_details_updated'
+  // ── Leave types & holidays ────────────────────────────────────────────────
+  | 'leave_type_created'
+  | 'leave_type_updated'
+  | 'leave_type_deleted'
+  | 'holiday_created'
+  | 'holiday_deleted'
+  // ── Loans ─────────────────────────────────────────────────────────────────
+  | 'loan_created'
+  | 'loan_emi_paid'
+  | 'loan_cancelled'
   // ── Super admin — tenant management ───────────────────────────────────────
   | 'tenant_created'
   | 'tenant_edited'

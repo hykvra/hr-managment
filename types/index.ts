@@ -138,3 +138,66 @@ export interface BonusHistoryRecord {
   bonus_month: string
   created_at: string
 }
+
+// Phase 2A — New types
+
+export interface LeaveType {
+  id: string
+  tenant_id: string
+  name: string
+  annual_quota: number
+  carry_forward_enabled: boolean
+  max_carry_forward: number
+  color: string
+  is_active: boolean
+  created_at: string
+}
+
+export interface CompanyHoliday {
+  id: string
+  tenant_id: string
+  name: string
+  date: string
+}
+
+export interface EmployeeLeaveBalance {
+  id: string
+  tenant_id: string
+  employee_id: string
+  leave_type_id: string
+  year: number
+  opening_balance: number
+  accrued: number
+  used: number
+  carry_forward: number
+}
+
+export interface StaffReportRow {
+  id: string
+  first_name: string
+  last_name: string
+  email: string
+  mobile: string
+  employee_code: string | null
+  role: Role
+  joining_date: string
+  base_salary: number
+  leave_balance: number
+  gender: string
+  dob: string
+  blood_group: string
+  address: string
+  bank_name: string | null
+  account_no: string | null
+  ifsc: string | null
+  branch_name: string | null
+  account_holder: string | null
+  emergency_name: string | null
+  emergency_phone: string | null
+  is_active: boolean
+  resignation_status: boolean
+  resignation_date: string | null
+  last_working_date: string | null
+  created_at: string
+  shifts: { name: string } | null
+}

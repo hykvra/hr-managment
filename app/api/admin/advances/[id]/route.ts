@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { activityLog } from '@/lib/activity-logger'
+import { sendAdvanceNotificationEmail } from '@/lib/mailer'
 
 async function canManageSalary(role: string, userId: string, tenantId: string): Promise<boolean> {
   if (role === 'master_admin') return true
@@ -29,6 +30,14 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
   const { action, approved_amount, comment } = await req.json()
 
+  // Fetch advance details for notification
+  const { data: advance } = await supabaseAdmin
+    .from('salary_advances')
+    .select('id, amount, employees(first_name, email)')
+    .eq('id', params.id)
+    .eq('tenant_id', tenantId)
+    .single()
+
   if (action === 'approve') {
     if (!approved_amount || Number(approved_amount) <= 0) {
       return NextResponse.json({ error: 'Approved amount is required' }, { status: 400 })
@@ -55,6 +64,19 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (error) return NextResponse.json({ error: 'Failed to reject advance' }, { status: 500 })
   } else {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+  }
+
+  // Send notification email (non-blocking)
+  const empData = advance?.employees as unknown as { first_name: string; email: string } | null
+  if (empData?.email && advance) {
+    sendAdvanceNotificationEmail(
+      empData.email,
+      empData.first_name,
+      action === 'approve' ? 'approved' : 'rejected',
+      Number(advance.amount),
+      action === 'approve' ? Number(approved_amount) : null,
+      comment,
+    ).catch(() => {})
   }
 
   await activityLog({

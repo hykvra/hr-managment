@@ -99,10 +99,72 @@ const EmptyState = ({ text }: { text: string }) => (
   <div className="flex items-center justify-center h-24 text-zinc-500 text-sm">{text}</div>
 )
 
+type LoanItem = {
+  id: string
+  amount: number
+  reason: string
+  emi_amount: number
+  disbursed_on: string
+  months_total: number
+  months_paid: number
+  status: string
+}
+
+type ExpenseItem = {
+  id: string
+  amount: number
+  category: string
+  description: string
+  status: string
+  approved_amount: number | null
+  manager_note: string | null
+  created_at: string
+}
+
+const EXPENSE_ICON: Record<string, string> = {
+  Travel: '✈️', Food: '🍽️', Medical: '🏥', Equipment: '🖥️', Accommodation: '🏨', Other: '📎',
+}
+
 export function HistoryTabs({ leaveRequests, advances, tickets, salaryHistory, bonusHistory }: Props) {
   const [payslips, setPayslips] = useState<Payslip[]>([])
   const [payslipsLoaded, setPayslipsLoaded] = useState(false)
   const [payslipsLoading, setPayslipsLoading] = useState(false)
+
+  const [loans, setLoans]             = useState<LoanItem[]>([])
+  const [loansLoaded, setLoansLoaded] = useState(false)
+  const [loansLoading, setLoansLoading] = useState(false)
+
+  const [expenses, setExpenses]             = useState<ExpenseItem[]>([])
+  const [expensesLoaded, setExpensesLoaded] = useState(false)
+  const [expensesLoading, setExpensesLoading] = useState(false)
+
+  const [warnings, setWarnings]             = useState<{ id: string; warning_type: string; subject: string; description: string; issued_on: string; acknowledged_at: string | null }[]>([])
+  const [warningsLoaded, setWarningsLoaded] = useState(false)
+  const [warningsLoading, setWarningsLoading] = useState(false)
+
+  const [regularizations, setRegularizations] = useState<{ id: string; date: string; requested_status: string; reason: string; status: string; manager_note: string | null }[]>([])
+  const [regsLoaded, setRegsLoaded]           = useState(false)
+  const [regsLoading, setRegsLoading]         = useState(false)
+
+  type ReviewItem = {
+    id: string
+    review_period: string
+    period_start: string
+    period_end: string
+    overall_rating: number | null
+    performance_rating: number | null
+    attendance_rating: number | null
+    behavior_rating: number | null
+    strengths: string | null
+    improvements: string | null
+    goals: string | null
+    comments: string | null
+    created_at: string
+    reviewer: { first_name: string; last_name: string } | null
+  }
+  const [reviews, setReviews]           = useState<ReviewItem[]>([])
+  const [reviewsLoaded, setReviewsLoaded] = useState(false)
+  const [reviewsLoading, setReviewsLoading] = useState(false)
 
   async function loadPayslips() {
     if (payslipsLoaded) return
@@ -117,6 +179,75 @@ export function HistoryTabs({ leaveRequests, advances, tickets, salaryHistory, b
     } finally {
       setPayslipsLoading(false)
     }
+  }
+
+  async function loadWarnings() {
+    if (warningsLoaded) return
+    setWarningsLoading(true)
+    try {
+      const res = await fetch('/api/employees/warnings')
+      if (res.ok) {
+        const { warnings: data } = await res.json()
+        setWarnings(data || [])
+        setWarningsLoaded(true)
+      }
+    } finally { setWarningsLoading(false) }
+  }
+
+  async function loadRegularizations() {
+    if (regsLoaded) return
+    setRegsLoading(true)
+    try {
+      const res = await fetch('/api/employees/regularization')
+      if (res.ok) {
+        const { regularizations: data } = await res.json()
+        setRegularizations(data || [])
+        setRegsLoaded(true)
+      }
+    } finally { setRegsLoading(false) }
+  }
+
+  async function loadExpenses() {
+    if (expensesLoaded) return
+    setExpensesLoading(true)
+    try {
+      const res = await fetch('/api/employees/expenses')
+      if (res.ok) {
+        const { expenses: data } = await res.json()
+        setExpenses(data || [])
+        setExpensesLoaded(true)
+      }
+    } finally {
+      setExpensesLoading(false)
+    }
+  }
+
+  async function loadLoans() {
+    if (loansLoaded) return
+    setLoansLoading(true)
+    try {
+      const res = await fetch('/api/employees/loans')
+      if (res.ok) {
+        const { loans: data } = await res.json()
+        setLoans(data || [])
+        setLoansLoaded(true)
+      }
+    } finally {
+      setLoansLoading(false)
+    }
+  }
+
+  async function loadReviews() {
+    if (reviewsLoaded) return
+    setReviewsLoading(true)
+    try {
+      const res = await fetch('/api/employees/performance-reviews')
+      if (res.ok) {
+        const { reviews: data } = await res.json()
+        setReviews(data || [])
+        setReviewsLoaded(true)
+      }
+    } finally { setReviewsLoading(false) }
   }
 
   return (
@@ -142,6 +273,26 @@ export function HistoryTabs({ leaveRequests, advances, tickets, salaryHistory, b
             <TabsTrigger value="payslips" className="text-xs data-[state=active]:bg-zinc-700 data-[state=active]:text-white"
               onClick={loadPayslips}>
               Payslips
+            </TabsTrigger>
+            <TabsTrigger value="loans" className="text-xs data-[state=active]:bg-zinc-700 data-[state=active]:text-white"
+              onClick={loadLoans}>
+              Loans
+            </TabsTrigger>
+            <TabsTrigger value="expenses" className="text-xs data-[state=active]:bg-zinc-700 data-[state=active]:text-white"
+              onClick={loadExpenses}>
+              Expenses
+            </TabsTrigger>
+            <TabsTrigger value="warnings" className="text-xs data-[state=active]:bg-zinc-700 data-[state=active]:text-white"
+              onClick={loadWarnings}>
+              Warnings
+            </TabsTrigger>
+            <TabsTrigger value="regularize" className="text-xs data-[state=active]:bg-zinc-700 data-[state=active]:text-white"
+              onClick={loadRegularizations}>
+              Regularizations
+            </TabsTrigger>
+            <TabsTrigger value="reviews" className="text-xs data-[state=active]:bg-zinc-700 data-[state=active]:text-white"
+              onClick={loadReviews}>
+              Reviews
             </TabsTrigger>
           </TabsList>
 
@@ -297,6 +448,249 @@ export function HistoryTabs({ leaveRequests, advances, tickets, salaryHistory, b
                           onClick={() => printPayslip(p)}>
                           <Printer className="w-3 h-3" /> Print
                         </Button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </TabsContent>
+          {/* Warnings */}
+          <TabsContent value="warnings">
+            {warningsLoading ? (
+              <EmptyState text="Loading warnings…" />
+            ) : !warningsLoaded ? (
+              <EmptyState text="Click the Warnings tab to load" />
+            ) : warnings.length === 0 ? (
+              <EmptyState text="No warning letters on record" />
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                {warnings.map(w => {
+                  const TYPE_CLS: Record<string, string> = {
+                    verbal:  'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+                    written: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
+                    final:   'bg-red-500/10 text-red-400 border-red-500/20',
+                  }
+                  return (
+                    <div key={w.id} className="bg-zinc-800 rounded-md px-3 py-2.5 space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${TYPE_CLS[w.warning_type] || ''}`}>
+                          {w.warning_type}
+                        </span>
+                        <span className="text-zinc-200 text-sm font-medium">{w.subject}</span>
+                      </div>
+                      <p className="text-zinc-500 text-xs line-clamp-2">{w.description}</p>
+                      <p className="text-[10px] text-zinc-600">{fmt(w.issued_on)}</p>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Regularizations */}
+          <TabsContent value="regularize">
+            {regsLoading ? (
+              <EmptyState text="Loading requests…" />
+            ) : !regsLoaded ? (
+              <EmptyState text="Click the Regularizations tab to load" />
+            ) : regularizations.length === 0 ? (
+              <EmptyState text="No regularization requests yet" />
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                {regularizations.map(reg => {
+                  const REG_STATUS_CLS: Record<string, string> = {
+                    pending:  'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+                    approved: 'bg-green-500/10 text-green-400 border-green-500/20',
+                    rejected: 'bg-red-500/10 text-red-400 border-red-500/20',
+                  }
+                  return (
+                    <div key={reg.id} className="flex items-start justify-between bg-zinc-800 rounded-md px-3 py-2.5 gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-zinc-200 text-sm font-medium">{fmt(reg.date)}</span>
+                          <span className="text-blue-400 text-[10px]">→ {reg.requested_status}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${REG_STATUS_CLS[reg.status] || ''}`}>
+                            {reg.status}
+                          </span>
+                        </div>
+                        <p className="text-zinc-500 text-xs mt-0.5 truncate">{reg.reason}</p>
+                        {reg.manager_note && (
+                          <p className="text-zinc-600 text-[10px] mt-0.5 italic">{reg.manager_note}</p>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Expenses */}
+          <TabsContent value="expenses">
+            {expensesLoading ? (
+              <EmptyState text="Loading expenses…" />
+            ) : !expensesLoaded ? (
+              <EmptyState text="Click the Expenses tab to load" />
+            ) : expenses.length === 0 ? (
+              <EmptyState text="No expense requests yet" />
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                {expenses.map(exp => {
+                  const STATUS_CLS: Record<string, string> = {
+                    pending:  'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+                    approved: 'bg-green-500/10 text-green-400 border-green-500/20',
+                    rejected: 'bg-red-500/10 text-red-400 border-red-500/20',
+                  }
+                  return (
+                    <div key={exp.id} className="flex items-start justify-between bg-zinc-800 rounded-md px-3 py-2.5 gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span>{EXPENSE_ICON[exp.category] || '📎'}</span>
+                          <span className="text-zinc-200 text-sm font-medium">{exp.category}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${STATUS_CLS[exp.status] || ''}`}>
+                            {exp.status}
+                          </span>
+                        </div>
+                        <p className="text-zinc-500 text-xs mt-0.5 truncate">{exp.description}</p>
+                        {exp.manager_note && (
+                          <p className="text-zinc-600 text-[10px] mt-0.5 italic">{exp.manager_note}</p>
+                        )}
+                        <p className="text-[10px] text-zinc-600 mt-0.5">{fmt(exp.created_at)}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-white font-bold text-sm">₹{Math.round(exp.amount).toLocaleString('en-IN')}</p>
+                        {exp.approved_amount && exp.approved_amount !== exp.amount && (
+                          <p className="text-green-400 text-[10px]">
+                            Approved ₹{Math.round(exp.approved_amount).toLocaleString('en-IN')}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Performance Reviews */}
+          <TabsContent value="reviews">
+            {reviewsLoading ? (
+              <EmptyState text="Loading reviews…" />
+            ) : !reviewsLoaded ? (
+              <EmptyState text="Click the Reviews tab to load" />
+            ) : reviews.length === 0 ? (
+              <EmptyState text="No published reviews yet" />
+            ) : (
+              <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+                {reviews.map(rv => {
+                  const stars = (val: number | null) =>
+                    val ? `${'★'.repeat(Math.round(val))}${'☆'.repeat(5 - Math.round(val))} ${val.toFixed(1)}` : null
+                  return (
+                    <div key={rv.id} className="bg-zinc-800 rounded-md px-3 py-2.5 space-y-2">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div>
+                          <p className="text-sm font-medium text-zinc-200">{rv.review_period}</p>
+                          <p className="text-[10px] text-zinc-500">
+                            {fmt(rv.period_start)} – {fmt(rv.period_end)}
+                          </p>
+                        </div>
+                        {rv.overall_rating && (
+                          <span className="text-yellow-400 text-sm font-medium">
+                            {stars(rv.overall_rating)}
+                          </span>
+                        )}
+                      </div>
+                      {(rv.performance_rating || rv.attendance_rating || rv.behavior_rating) && (
+                        <div className="flex flex-wrap gap-2 text-[10px] text-zinc-500">
+                          {rv.performance_rating && <span>Perf: <span className="text-yellow-400">{rv.performance_rating.toFixed(1)}</span></span>}
+                          {rv.attendance_rating && <span>Att: <span className="text-yellow-400">{rv.attendance_rating.toFixed(1)}</span></span>}
+                          {rv.behavior_rating && <span>Beh: <span className="text-yellow-400">{rv.behavior_rating.toFixed(1)}</span></span>}
+                        </div>
+                      )}
+                      {rv.strengths && (
+                        <div>
+                          <p className="text-[10px] text-zinc-500 mb-0.5">Strengths</p>
+                          <p className="text-xs text-zinc-300">{rv.strengths}</p>
+                        </div>
+                      )}
+                      {rv.improvements && (
+                        <div>
+                          <p className="text-[10px] text-zinc-500 mb-0.5">Areas to Improve</p>
+                          <p className="text-xs text-zinc-300">{rv.improvements}</p>
+                        </div>
+                      )}
+                      {rv.goals && (
+                        <div>
+                          <p className="text-[10px] text-zinc-500 mb-0.5">Goals</p>
+                          <p className="text-xs text-zinc-300">{rv.goals}</p>
+                        </div>
+                      )}
+                      {rv.comments && (
+                        <p className="text-xs text-zinc-400 italic">&quot;{rv.comments}&quot;</p>
+                      )}
+                      {rv.reviewer && (
+                        <p className="text-[10px] text-zinc-600">
+                          Reviewed by {rv.reviewer.first_name} {rv.reviewer.last_name} · {fmt(rv.created_at)}
+                        </p>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Loans */}
+          <TabsContent value="loans">
+            {loansLoading ? (
+              <EmptyState text="Loading loans…" />
+            ) : !loansLoaded ? (
+              <EmptyState text="Click the Loans tab to load" />
+            ) : loans.length === 0 ? (
+              <EmptyState text="No loans on record" />
+            ) : (
+              <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+                {loans.map(loan => {
+                  const balance = Math.max(0, loan.amount - loan.emi_amount * loan.months_paid)
+                  const pct = loan.months_total > 0 ? Math.round((loan.months_paid / loan.months_total) * 100) : 0
+                  const STATUS_CLS: Record<string, string> = {
+                    active:    'bg-green-500/10 text-green-400 border-green-500/20',
+                    cleared:   'bg-blue-500/10 text-blue-400 border-blue-500/20',
+                    cancelled: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20',
+                  }
+                  return (
+                    <div key={loan.id} className="bg-zinc-800 rounded-md px-3 py-2.5 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm text-zinc-200 font-medium">
+                            ₹{Math.round(loan.amount).toLocaleString('en-IN')}
+                            <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${STATUS_CLS[loan.status] || ''}`}>
+                              {loan.status}
+                            </span>
+                          </p>
+                          <p className="text-xs text-zinc-500 mt-0.5">{loan.reason}</p>
+                          <p className="text-[10px] text-zinc-600 mt-0.5">
+                            Disbursed {fmt(loan.disbursed_on)} · EMI ₹{Math.round(loan.emi_amount).toLocaleString('en-IN')}/mo
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-xs text-zinc-400">{loan.months_paid}/{loan.months_total} paid</p>
+                          {loan.status === 'active' && (
+                            <p className="text-xs text-zinc-300 font-medium">
+                              Bal ₹{Math.round(balance).toLocaleString('en-IN')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="h-1.5 bg-zinc-700 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${loan.status === 'cleared' ? 'bg-blue-500' : 'bg-green-500'}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <p className="text-[10px] text-zinc-600 mt-0.5 text-right">{pct}% repaid</p>
                       </div>
                     </div>
                   )

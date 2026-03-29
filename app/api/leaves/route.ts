@@ -3,6 +3,23 @@ import { getSession } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { activityLog } from '@/lib/activity-logger'
 
+export async function GET() {
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const tenantId = session.tenant_id
+  if (!tenantId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+
+  const { data, error } = await supabaseAdmin
+    .from('leave_requests')
+    .select('id, leave_type, leave_date, end_date, status, manager_comment, exception_flag, created_at')
+    .eq('tenant_id', tenantId)
+    .eq('employee_id', session.id)
+    .order('created_at', { ascending: false })
+
+  if (error) return NextResponse.json({ error: 'Failed to fetch leaves' }, { status: 500 })
+  return NextResponse.json({ leaves: data || [] })
+}
+
 export async function POST(req: Request) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -17,9 +34,34 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
-  const validTypes = ['Sick', 'Casual', 'Earned', 'Vacation']
+  // Validate leave type — check against custom leave_types table first, then fallback to legacy
+  const { data: leaveTypes } = await supabaseAdmin
+    .from('leave_types')
+    .select('name')
+    .eq('tenant_id', tenantId)
+    .eq('is_active', true)
+
+  const validTypes = leaveTypes && leaveTypes.length > 0
+    ? leaveTypes.map(lt => lt.name)
+    : ['Sick', 'Casual', 'Earned', 'Vacation']
+
   if (!validTypes.includes(leave_type)) {
     return NextResponse.json({ error: 'Invalid leave type' }, { status: 400 })
+  }
+
+  // Check if leave_date is a company holiday
+  const { data: holiday } = await supabaseAdmin
+    .from('company_holidays')
+    .select('name')
+    .eq('tenant_id', tenantId)
+    .eq('date', leave_date)
+    .maybeSingle()
+
+  if (holiday) {
+    return NextResponse.json(
+      { error: `${leave_date} is a company holiday (${holiday.name}). No leave request needed.` },
+      { status: 400 }
+    )
   }
 
   // Check for existing pending/approved leave on this start date

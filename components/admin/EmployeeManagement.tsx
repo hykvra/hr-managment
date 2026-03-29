@@ -1,15 +1,16 @@
 'use client'
 
 import Image from 'next/image'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, TrendingUp, Gift, RefreshCw, UserX, ChevronDown, X } from 'lucide-react'
+import { Search, TrendingUp, Gift, RefreshCw, UserX, ChevronDown, X, Settings, FolderOpen, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
+import { PayComponentsPanel } from './PayComponentsPanel'
 
 type Employee = {
   id: string
@@ -24,13 +25,32 @@ type Employee = {
   leave_balance: number
   joining_date: string
   profile_photo: string | null
+  department: string | null
+  employment_type: string
+  pf_enabled: boolean
+  esi_enabled: boolean
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   shifts: any
 }
 
 type Shift = { id: string; name: string }
+type Department = { id: string; name: string }
 
-type ModalType = 'salary' | 'bonus' | 'shift' | 'deactivate' | null
+type ModalType = 'salary' | 'bonus' | 'shift' | 'deactivate' | 'edit_details' | null
+
+type DocItem = {
+  id: string
+  doc_type: string
+  doc_name: string
+  file_url: string
+  file_size: number | null
+  uploaded_at: string
+}
+
+const DOC_ICON: Record<string, string> = {
+  aadhaar: '🪪', pan: '💳', passport: '🛂', offer_letter: '📄',
+  experience: '📋', certificate: '🎓', other: '📎',
+}
 
 const MONTHS = ['January','February','March','April','May','June',
   'July','August','September','October','November','December']
@@ -44,6 +64,7 @@ export function EmployeeManagement() {
   const router = useRouter()
   const [employees, setEmployees] = useState<Employee[]>([])
   const [shifts, setShifts] = useState<Shift[]>([])
+  const [departments, setDepartments] = useState<Department[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [shiftFilter, setShiftFilter] = useState('all')
@@ -51,11 +72,34 @@ export function EmployeeManagement() {
 
   // Modal state
   const [modal, setModal] = useState<ModalType>(null)
+
+  // Per-employee documents (lazy-loaded on expand)
+  const [empDocs, setEmpDocs] = useState<Record<string, DocItem[]>>({})
+  const [docsLoading, setDocsLoading] = useState<Record<string, boolean>>({})
+
+  const loadDocs = useCallback(async (empId: string) => {
+    if (empDocs[empId] !== undefined) return
+    setDocsLoading(prev => ({ ...prev, [empId]: true }))
+    try {
+      const res = await fetch(`/api/admin/employees/${empId}/documents`)
+      if (res.ok) {
+        const { documents } = await res.json()
+        setEmpDocs(prev => ({ ...prev, [empId]: documents || [] }))
+      }
+    } finally {
+      setDocsLoading(prev => ({ ...prev, [empId]: false }))
+    }
+  }, [empDocs])
   const [selected, setSelected] = useState<Employee | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [apiError, setApiError] = useState('')
 
   // Form fields
+  const [empDept, setEmpDept] = useState('')
+  const [empType, setEmpType] = useState('regular')
+  const [pfEnabled, setPfEnabled] = useState(false)
+  const [esiEnabled, setEsiEnabled] = useState(false)
+
   const [newSalary, setNewSalary] = useState('')
   const [salaryMessage, setSalaryMessage] = useState('')
   const [bonusAmount, setBonusAmount] = useState('')
@@ -65,9 +109,10 @@ export function EmployeeManagement() {
   async function fetchEmployees() {
     setLoading(true)
     try {
-      const [empRes, shiftRes] = await Promise.all([
+      const [empRes, shiftRes, deptRes] = await Promise.all([
         fetch('/api/admin/employees'),
         fetch('/api/admin/shifts'),
+        fetch('/api/admin/departments'),
       ])
       if (empRes.ok) {
         const { employees: data } = await empRes.json() as { employees: Employee[] }
@@ -76,6 +121,10 @@ export function EmployeeManagement() {
       if (shiftRes.ok) {
         const { shifts: data } = await shiftRes.json() as { shifts: Shift[] }
         setShifts(data)
+      }
+      if (deptRes.ok) {
+        const { departments: data } = await deptRes.json() as { departments: Department[] }
+        setDepartments(data)
       }
     } finally {
       setLoading(false)
@@ -106,6 +155,10 @@ export function EmployeeManagement() {
     setBonusAmount('')
     setBonusReason('')
     setNewShiftId(emp.shift_id || '')
+    setEmpDept(emp.department || '')
+    setEmpType(emp.employment_type || 'regular')
+    setPfEnabled(emp.pf_enabled || false)
+    setEsiEnabled(emp.esi_enabled || false)
   }
 
   function closeModal() {
@@ -226,7 +279,11 @@ export function EmployeeManagement() {
                   </Button>
                   <Button size="sm" variant="ghost"
                     className="h-6 w-6 p-0 text-zinc-400"
-                    onClick={() => setExpanded(isExpanded ? null : emp.id)}>
+                    onClick={() => {
+                      const next = isExpanded ? null : emp.id
+                      setExpanded(next)
+                      if (next) loadDocs(next)
+                    }}>
                     <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                   </Button>
                 </div>
@@ -239,6 +296,12 @@ export function EmployeeManagement() {
                     <div><p className="text-zinc-500 text-[10px]">Email</p><p className="text-zinc-300 truncate">{emp.email}</p></div>
                     <div><p className="text-zinc-500 text-[10px]">Mobile</p><p className="text-zinc-300">{emp.mobile}</p></div>
                     <div><p className="text-zinc-500 text-[10px]">Joined</p><p className="text-zinc-300">{fmt(emp.joining_date)}</p></div>
+                    {emp.department && <div><p className="text-zinc-500 text-[10px]">Department</p><p className="text-zinc-300">{emp.department}</p></div>}
+                    <div><p className="text-zinc-500 text-[10px]">Type</p><p className="text-zinc-300 capitalize">{emp.employment_type || 'Regular'}</p></div>
+                    <div className="flex gap-2">
+                      {emp.pf_enabled && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">PF</span>}
+                      {emp.esi_enabled && <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">ESI</span>}
+                    </div>
                   </div>
                   <div className="flex flex-wrap gap-2 pt-1">
                     <Button size="sm" variant="outline"
@@ -257,10 +320,50 @@ export function EmployeeManagement() {
                       <RefreshCw className="w-3 h-3" /> Change Shift
                     </Button>
                     <Button size="sm" variant="outline"
+                      className="h-7 text-xs border-zinc-700 text-zinc-300 hover:text-white gap-1"
+                      onClick={() => openModal('edit_details', emp)}>
+                      <Settings className="w-3 h-3" /> Details
+                    </Button>
+                    <Button size="sm" variant="outline"
                       className="h-7 text-xs border-zinc-700 text-red-400 hover:text-red-300 gap-1"
                       onClick={() => openModal('deactivate', emp)}>
                       <UserX className="w-3 h-3" /> Deactivate
                     </Button>
+                  </div>
+                  <div className="mt-3 border-t border-zinc-700/50 pt-3">
+                    <p className="text-zinc-400 text-xs font-medium mb-2">Pay Components</p>
+                    <PayComponentsPanel employeeId={emp.id} baseSalary={emp.base_salary} />
+                  </div>
+
+                  {/* Documents */}
+                  <div className="mt-3 border-t border-zinc-700/50 pt-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <FolderOpen className="w-3.5 h-3.5 text-zinc-500" />
+                      <p className="text-zinc-400 text-xs font-medium">Documents</p>
+                    </div>
+                    {docsLoading[emp.id] ? (
+                      <p className="text-zinc-600 text-xs py-1">Loading…</p>
+                    ) : !empDocs[emp.id] || empDocs[emp.id].length === 0 ? (
+                      <p className="text-zinc-600 text-xs">No documents uploaded</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {empDocs[emp.id].map(doc => (
+                          <a
+                            key={doc.id}
+                            href={doc.file_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-md px-2.5 py-1.5 transition-colors group"
+                          >
+                            <span className="text-sm">{DOC_ICON[doc.doc_type] || '📎'}</span>
+                            <span className="text-[11px] text-zinc-300 group-hover:text-white">
+                              {doc.doc_name || doc.doc_type.replace(/_/g, ' ')}
+                            </span>
+                            <ExternalLink className="w-2.5 h-2.5 text-zinc-600 group-hover:text-zinc-400" />
+                          </a>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -279,7 +382,8 @@ export function EmployeeManagement() {
                 <p className="text-white font-semibold text-sm">
                   {modal === 'salary' ? 'Update Salary' :
                    modal === 'bonus' ? 'Add Bonus' :
-                   modal === 'shift' ? 'Change Shift' : 'Deactivate Employee'}
+                   modal === 'shift' ? 'Change Shift' :
+                   modal === 'edit_details' ? 'Edit Details' : 'Deactivate Employee'}
                 </p>
                 <p className="text-zinc-500 text-xs mt-0.5">{selected.first_name} {selected.last_name}</p>
               </div>
@@ -372,6 +476,52 @@ export function EmployeeManagement() {
                     disabled={submitting}
                     onClick={() => submit('shift_change', { shift_id: newShiftId === 'none' ? null : newShiftId })}>
                     {submitting ? 'Saving…' : 'Change Shift'}
+                  </Button>
+                </>
+              )}
+
+              {/* Edit details modal */}
+              {modal === 'edit_details' && (
+                <>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-zinc-400">Department</Label>
+                    {departments.length > 0 ? (
+                      <select value={empDept} onChange={e => setEmpDept(e.target.value)}
+                        className="w-full h-8 bg-zinc-800 border border-zinc-700 text-white text-xs rounded-md px-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                        <option value="">No department</option>
+                        {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                      </select>
+                    ) : (
+                      <Input value={empDept} onChange={e => setEmpDept(e.target.value)}
+                        placeholder="e.g. Engineering, Sales, HR"
+                        className="h-8 text-xs bg-zinc-800 border-zinc-700 text-white" />
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-zinc-400">Employment Type</Label>
+                    <select value={empType} onChange={e => setEmpType(e.target.value)}
+                      className="w-full h-8 bg-zinc-800 border border-zinc-700 text-white text-xs rounded-md px-2">
+                      <option value="regular">Regular (Threshold-based salary)</option>
+                      <option value="contractual">Contractual (Fixed monthly)</option>
+                      <option value="daily_wage">Daily Wage (Actual days × rate)</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={pfEnabled} onChange={e => setPfEnabled(e.target.checked)}
+                        className="w-4 h-4 accent-blue-500" />
+                      <span className="text-zinc-300 text-xs">PF (12% of basic)</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={esiEnabled} onChange={e => setEsiEnabled(e.target.checked)}
+                        className="w-4 h-4 accent-purple-500" />
+                      <span className="text-zinc-300 text-xs">ESI (if gross ≤ ₹21K)</span>
+                    </label>
+                  </div>
+                  <Button className="w-full h-8 text-xs bg-blue-600 hover:bg-blue-700"
+                    disabled={submitting}
+                    onClick={() => submit('edit_details', { department: empDept, employment_type: empType, pf_enabled: pfEnabled, esi_enabled: esiEnabled })}>
+                    {submitting ? 'Saving…' : 'Save Details'}
                   </Button>
                 </>
               )}
