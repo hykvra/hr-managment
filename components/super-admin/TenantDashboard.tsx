@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import {
   Plus, Edit2, Users, CheckCircle2, Clock, XCircle,
-  ExternalLink, Loader2, Building2, Globe, Shield
+  ExternalLink, Loader2, Building2, Globe, Shield, UserPlus, ChevronRight, X
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -25,6 +25,17 @@ type Tenant = {
   max_employees: number
   employee_count: number
   trial_ends_at: string | null
+  created_at: string
+}
+
+type Employee = {
+  id: string
+  first_name: string
+  last_name: string
+  email: string
+  role: string
+  is_active: boolean
+  employee_code: string
   created_at: string
 }
 
@@ -48,8 +59,18 @@ const editSchema = z.object({
   max_employees: z.preprocess(v => Number(v), z.number().min(1).max(10000)),
 })
 
+const addEmployeeSchema = z.object({
+  first_name: z.string().optional(),
+  last_name: z.string().optional(),
+  email: z.string().email('Valid email required'),
+  password: z.string().min(8, 'At least 8 characters'),
+  role: z.enum(['master_admin', 'manager', 'attendance', 'employee']),
+  employee_code: z.string().optional(),
+})
+
 type CreateData = z.infer<typeof createSchema>
 type EditData = z.infer<typeof editSchema>
+type AddEmployeeData = z.infer<typeof addEmployeeSchema>
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -83,6 +104,13 @@ export function TenantDashboard({ tenants: initial, superAdminName }: Props) {
   const [editTenant, setEditTenant] = useState<Tenant | null>(null)
   const [apiError, setApiError] = useState('')
   const [editError, setEditError] = useState('')
+
+  // Employee panel state
+  const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null)
+  const [employees, setEmployees] = useState<Employee[]>([])
+  const [empLoading, setEmpLoading] = useState(false)
+  const [showAddEmployee, setShowAddEmployee] = useState(false)
+  const [addEmpError, setAddEmpError] = useState('')
 
   // ── Stats ──────────────────────────────────────────────────────────────────
   const stats = {
@@ -149,6 +177,48 @@ export function TenantDashboard({ tenants: initial, superAdminName }: Props) {
     if (!res.ok) { setEditError(json.error || 'Failed'); return }
     setEditTenant(null)
     fetchTenants()
+  }
+
+  // ── Employee management ────────────────────────────────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const addEmpForm = useForm<AddEmployeeData>({ resolver: zodResolver(addEmployeeSchema) as any,
+    defaultValues: { role: 'employee' },
+  })
+
+  const openTenantEmployees = async (t: Tenant) => {
+    setSelectedTenant(t)
+    setEmpLoading(true)
+    setShowAddEmployee(false)
+    setAddEmpError('')
+    const res = await fetch(`/api/super-admin/tenants/${t.id}/employees`)
+    if (res.ok) {
+      const json = await res.json()
+      setEmployees(json.employees)
+    }
+    setEmpLoading(false)
+  }
+
+  const onAddEmployee = async (data: AddEmployeeData) => {
+    if (!selectedTenant) return
+    setAddEmpError('')
+    const res = await fetch(`/api/super-admin/tenants/${selectedTenant.id}/employees`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    const json = await res.json()
+    if (!res.ok) { setAddEmpError(json.error || 'Failed'); return }
+    setShowAddEmployee(false)
+    addEmpForm.reset({ role: 'employee' })
+    openTenantEmployees(selectedTenant)
+    fetchTenants()
+  }
+
+  const roleColor = (role: string) => {
+    if (role === 'master_admin') return 'text-violet-400 bg-violet-500/10 border-violet-500/20'
+    if (role === 'manager') return 'text-blue-400 bg-blue-500/10 border-blue-500/20'
+    if (role === 'attendance') return 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+    return 'text-zinc-400 bg-zinc-700/50 border-zinc-600/30'
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -256,6 +326,13 @@ export function TenantDashboard({ tenants: initial, superAdminName }: Props) {
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => openTenantEmployees(t)}
+                        className="flex items-center gap-1 text-xs text-violet-400 hover:text-violet-300 hover:bg-violet-500/10 px-2 py-1 rounded transition-colors border border-violet-500/20"
+                        title="Manage employees"
+                      >
+                        <Users className="w-3 h-3" /> Manage
+                      </button>
                       <a
                         href={`https://${t.slug}.hrjo.in/admin/dashboard`}
                         target="_blank"
@@ -415,6 +492,211 @@ export function TenantDashboard({ tenants: initial, superAdminName }: Props) {
                   className="flex-1 bg-violet-600 hover:bg-violet-700 text-white text-sm"
                 >
                   {createForm.formState.isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create Tenant'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Employee Panel (slide-over) ────────────────────────────────────── */}
+      {selectedTenant && (
+        <div className="fixed inset-0 z-40 flex">
+          {/* Backdrop */}
+          <div
+            className="flex-1 bg-black/50 backdrop-blur-sm"
+            onClick={() => { setSelectedTenant(null); setShowAddEmployee(false) }}
+          />
+          {/* Panel */}
+          <div className="w-full max-w-lg bg-zinc-900 border-l border-zinc-800 flex flex-col h-full overflow-hidden shadow-2xl">
+            {/* Panel header */}
+            <div className="px-5 py-4 border-b border-zinc-800 flex items-center justify-between shrink-0">
+              <div>
+                <h2 className="text-white font-semibold text-sm">{selectedTenant.company_name}</h2>
+                <p className="text-zinc-500 text-xs mt-0.5">{selectedTenant.slug}.hrjo.in · Employees &amp; Admins</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => { setShowAddEmployee(true); setAddEmpError(''); addEmpForm.reset({ role: 'employee' }) }}
+                  className="bg-violet-600 hover:bg-violet-700 text-white text-xs gap-1.5 h-7"
+                >
+                  <UserPlus className="w-3 h-3" /> Add
+                </Button>
+                <button
+                  onClick={() => { setSelectedTenant(null); setShowAddEmployee(false) }}
+                  className="text-zinc-400 hover:text-white p-1.5 rounded hover:bg-zinc-800 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Employee list */}
+            <div className="flex-1 overflow-y-auto">
+              {empLoading ? (
+                <div className="flex items-center justify-center py-20">
+                  <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+                </div>
+              ) : employees.length === 0 ? (
+                <div className="flex flex-col items-center py-20 text-zinc-500">
+                  <Users className="w-10 h-10 mb-3 opacity-30" />
+                  <p className="text-sm">No employees yet</p>
+                  <p className="text-xs mt-1">Add the first admin or employee</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-zinc-800/60">
+                  {employees.map(emp => (
+                    <div key={emp.id} className="px-5 py-3.5 flex items-center gap-3 hover:bg-zinc-800/30 transition-colors">
+                      <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center shrink-0">
+                        <span className="text-white text-xs font-semibold">
+                          {(emp.first_name?.[0] || emp.email[0]).toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-white text-sm font-medium truncate">
+                            {emp.first_name || emp.email.split('@')[0]}{emp.last_name ? ` ${emp.last_name}` : ''}
+                          </span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium shrink-0 ${roleColor(emp.role)}`}>
+                            {emp.role.replace('_', ' ')}
+                          </span>
+                        </div>
+                        <p className="text-zinc-500 text-xs truncate">{emp.email}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-zinc-600 text-[10px] hidden sm:block">{emp.employee_code}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${emp.is_active ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : 'text-zinc-500 bg-zinc-800 border-zinc-700'}`}>
+                          {emp.is_active ? 'active' : 'inactive'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Panel footer */}
+            <div className="px-5 py-3 border-t border-zinc-800 shrink-0">
+              <p className="text-zinc-600 text-xs">{employees.length} of {selectedTenant.max_employees} seats used</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Add Employee Modal ──────────────────────────────────────────────── */}
+      {showAddEmployee && selectedTenant && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
+              <div>
+                <h2 className="text-white font-semibold text-sm">Add Employee / Admin</h2>
+                <p className="text-zinc-500 text-xs mt-0.5">{selectedTenant.company_name}</p>
+              </div>
+              <button
+                onClick={() => setShowAddEmployee(false)}
+                className="text-zinc-400 hover:text-white p-1 rounded hover:bg-zinc-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={addEmpForm.handleSubmit(onAddEmployee)} className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-zinc-300 text-xs">First Name</Label>
+                  <Input
+                    placeholder="John"
+                    className="bg-zinc-800 border-zinc-700 text-white text-sm placeholder:text-zinc-500 focus:border-violet-500"
+                    {...addEmpForm.register('first_name')}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-zinc-300 text-xs">Last Name</Label>
+                  <Input
+                    placeholder="Smith"
+                    className="bg-zinc-800 border-zinc-700 text-white text-sm placeholder:text-zinc-500 focus:border-violet-500"
+                    {...addEmpForm.register('last_name')}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-zinc-300 text-xs">Email *</Label>
+                <Input
+                  type="email"
+                  placeholder="john@company.com"
+                  className="bg-zinc-800 border-zinc-700 text-white text-sm placeholder:text-zinc-500 focus:border-violet-500"
+                  {...addEmpForm.register('email')}
+                />
+                {addEmpForm.formState.errors.email && (
+                  <p className="text-red-400 text-xs">{addEmpForm.formState.errors.email.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-zinc-300 text-xs">Password *</Label>
+                <Input
+                  type="password"
+                  placeholder="Min 8 characters"
+                  className="bg-zinc-800 border-zinc-700 text-white text-sm placeholder:text-zinc-500 focus:border-violet-500"
+                  {...addEmpForm.register('password')}
+                />
+                {addEmpForm.formState.errors.password && (
+                  <p className="text-red-400 text-xs">{addEmpForm.formState.errors.password.message}</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-zinc-300 text-xs">Role *</Label>
+                  <select
+                    className="w-full h-9 rounded-md border border-zinc-700 bg-zinc-800 text-white text-sm px-3 focus:border-violet-500 focus:outline-none"
+                    {...addEmpForm.register('role')}
+                  >
+                    <option value="employee">Employee</option>
+                    <option value="attendance">Attendance</option>
+                    <option value="manager">Manager</option>
+                    <option value="master_admin">Master Admin</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-zinc-300 text-xs">Employee Code <span className="text-zinc-600">(auto)</span></Label>
+                  <Input
+                    placeholder="e.g. ACME-001"
+                    className="bg-zinc-800 border-zinc-700 text-white text-sm placeholder:text-zinc-500 focus:border-violet-500"
+                    {...addEmpForm.register('employee_code')}
+                  />
+                </div>
+              </div>
+
+              <div className="bg-zinc-800/50 rounded-lg p-3 flex items-start gap-2">
+                <ChevronRight className="w-3.5 h-3.5 text-zinc-500 mt-0.5 shrink-0" />
+                <p className="text-zinc-500 text-[11px] leading-relaxed">
+                  The employee will be able to log in at <span className="text-zinc-300">{selectedTenant.slug}.hrjo.in/login</span> using these credentials. Master admins will see the onboarding wizard on first login.
+                </p>
+              </div>
+
+              {addEmpError && (
+                <div className="bg-red-500/10 border border-red-500/20 rounded p-2.5">
+                  <p className="text-red-400 text-xs">{addEmpError}</p>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1 border-zinc-700 text-zinc-300 hover:bg-zinc-800 text-sm"
+                  onClick={() => setShowAddEmployee(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={addEmpForm.formState.isSubmitting}
+                  className="flex-1 bg-violet-600 hover:bg-violet-700 text-white text-sm"
+                >
+                  {addEmpForm.formState.isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create Account'}
                 </Button>
               </div>
             </form>
