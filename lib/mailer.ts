@@ -9,10 +9,10 @@ function getFrom(): string {
 }
 
 export async function sendOTPEmail(email: string, otp: string): Promise<void> {
-  await getResend().emails.send({
+  const { data, error } = await getResend().emails.send({
     from: getFrom(),
     to: email,
-    subject: 'Your ESAM HR Password Reset OTP',
+    subject: 'Your hrjo.in HR Portal — Password Reset OTP',
     html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#18181b;color:#fafafa;border-radius:12px;">
         <h2 style="margin:0 0 8px;color:#3b82f6;">Password Reset</h2>
@@ -24,6 +24,11 @@ export async function sendOTPEmail(email: string, otp: string): Promise<void> {
       </div>
     `,
   })
+  if (error) {
+    console.error('[mailer] sendOTPEmail failed:', JSON.stringify(error))
+    throw new Error(error.message)
+  }
+  console.log('[mailer] sendOTPEmail sent, id:', data?.id)
 }
 
 export async function sendWelcomeEmail(email: string, name: string): Promise<void> {

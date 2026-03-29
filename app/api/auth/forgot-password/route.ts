@@ -51,7 +51,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (err) {
-    console.error('Forgot password error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    const msg = err instanceof Error ? err.message : 'Internal server error'
+    console.error('Forgot password error:', msg)
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
