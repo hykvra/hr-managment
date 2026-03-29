@@ -4,7 +4,9 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { AdminTabs } from '@/components/admin/AdminTabs'
-import { Users, CalendarCheck, Banknote, Ticket } from 'lucide-react'
+import { Users, CalendarCheck, Banknote, Ticket, Clock, ArrowRight } from 'lucide-react'
+import { parseBranding } from '@/lib/branding'
+import { getSubscriptionInfo } from '@/lib/subscription'
 
 export default async function AdminDashboard() {
   const session = await getSession()
@@ -18,6 +20,19 @@ export default async function AdminDashboard() {
 
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
   const tid = session.tenant_id
+
+  // ── Subscription gate — check before heavy queries ────────────────────────
+  const { data: tenant } = await supabaseAdmin
+    .from('tenants')
+    .select('id, slug, company_name, plan, status, max_employees, trial_ends_at, created_at')
+    .eq('id', tid)
+    .single()
+
+  if (tenant) {
+    const subInfo = getSubscriptionInfo(tenant)
+    if (subInfo.status === 'suspended') redirect('/suspended')
+    if (subInfo.status === 'trial_expired') redirect('/trial-expired')
+  }
 
   const [
     { data: pendingEmployees },
@@ -68,6 +83,8 @@ export default async function AdminDashboard() {
     supabaseAdmin.from('employees').select('*', { count: 'exact', head: true }).eq('tenant_id', tid).eq('is_active', false),
   ])
 
+  const branding = parseBranding(companySettings || [])
+
   const stats = [
     { label: 'Pending Registrations', value: pendingRegCount ?? 0,    icon: Users,         color: 'text-yellow-400', bg: 'bg-yellow-500/10' },
     { label: 'Pending Leaves',        value: pendingLeaveCount ?? 0,   icon: CalendarCheck, color: 'text-blue-400',   bg: 'bg-blue-500/10'   },
@@ -80,10 +97,13 @@ export default async function AdminDashboard() {
       {/* Top Bar */}
       <header className="border-b border-zinc-800 bg-zinc-900 px-4 sm:px-6 py-3 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-blue-600 rounded-md flex items-center justify-center shrink-0">
-            <span className="text-white font-bold text-xs">E</span>
+          <div
+            className="w-7 h-7 rounded-md flex items-center justify-center shrink-0"
+            style={{ backgroundColor: branding.color }}
+          >
+            <span className="text-white font-bold text-xs">{branding.initials}</span>
           </div>
-          <span className="font-semibold text-white text-sm">ESAM HR — Admin</span>
+          <span className="font-semibold text-white text-sm">{branding.name} — Admin</span>
         </div>
         <div className="flex items-center gap-3">
           <Badge variant="secondary" className="text-xs capitalize">{session.role.replace('_', ' ')}</Badge>
@@ -96,6 +116,37 @@ export default async function AdminDashboard() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+
+        {/* Trial banner */}
+        {tenant && getSubscriptionInfo(tenant).status === 'trial' && (() => {
+          const info = getSubscriptionInfo(tenant)
+          const urgent = (info.trialDaysLeft ?? 30) <= 7
+          return (
+            <div className={`flex items-center justify-between gap-3 rounded-lg px-4 py-3 border text-sm ${
+              urgent
+                ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                : 'bg-zinc-800 border-zinc-700 text-zinc-300'
+            }`}>
+              <div className="flex items-center gap-2">
+                <Clock className={`w-4 h-4 shrink-0 ${urgent ? 'text-amber-400' : 'text-zinc-400'}`} />
+                <span>
+                  {urgent
+                    ? `Trial expires in ${info.trialDaysLeft} day${info.trialDaysLeft === 1 ? '' : 's'} — upgrade to keep access.`
+                    : `Free trial · ${info.trialDaysLeft} days remaining.`}
+                </span>
+              </div>
+              <a
+                href="mailto:support@hrjo.in?subject=Plan%20Upgrade%20Request"
+                className={`flex items-center gap-1 text-xs font-medium whitespace-nowrap hover:underline ${
+                  urgent ? 'text-amber-400' : 'text-violet-400'
+                }`}
+              >
+                Upgrade now <ArrowRight className="w-3 h-3" />
+              </a>
+            </div>
+          )
+        })()}
+
         <div>
           <h1 className="text-xl font-bold text-white">Admin Dashboard</h1>
           <p className="text-zinc-400 text-xs mt-0.5">Manage employees, leaves, advances, and settings</p>

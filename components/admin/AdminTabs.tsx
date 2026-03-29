@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Users, CalendarCheck, Banknote, Ticket, Clock, Megaphone, Settings, Wallet, UserCog, BarChart2 } from 'lucide-react'
+import { Users, CalendarCheck, Banknote, Ticket, Clock, Megaphone, Settings, Wallet, UserCog, BarChart2, CreditCard } from 'lucide-react'
 import { EmployeeApprovals } from './EmployeeApprovals'
 import { LeaveManagement } from './LeaveManagement'
 import { AdvanceManagement } from './AdvanceManagement'
@@ -12,6 +12,7 @@ import { PolicySettings } from './PolicySettings'
 import { PayrollRun } from './PayrollRun'
 import { EmployeeManagement } from './EmployeeManagement'
 import { Reports } from './Reports'
+import { BillingPanel } from './BillingPanel'
 
 // ── Data types ────────────────────────────────────────────────────────────────
 
@@ -80,6 +81,7 @@ const TAB_CONFIG = [
   { id: 'payroll',     label: 'Payroll',    Icon: Wallet,        masterOnly: true  },
   { id: 'reports',     label: 'Reports',    Icon: BarChart2,     masterOnly: true  },
   { id: 'settings',    label: 'Settings',   Icon: Settings,      masterOnly: true  },
+  { id: 'billing',     label: 'Billing',    Icon: CreditCard,    masterOnly: true  },
 ] as const
 
 type TabId = (typeof TAB_CONFIG)[number]['id']
@@ -175,6 +177,9 @@ export function AdminTabs({
         )}
         {active === 'settings' && (
           <PolicySettings companySettings={companySettings} managers={managers} />
+        )}
+        {active === 'billing' && (
+          <BillingPanel />
         )}
       </div>
     </div>

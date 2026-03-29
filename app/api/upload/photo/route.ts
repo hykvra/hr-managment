@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
+import { getSession } from '@/lib/auth'
+import { resolveTenantId } from '@/lib/tenant'
 
 const s3 = new S3Client({
   endpoint: process.env.RAILWAY_STORAGE_ENDPOINT!,
@@ -15,6 +17,19 @@ const BUCKET = process.env.RAILWAY_STORAGE_BUCKET!
 
 export async function POST(req: NextRequest) {
   try {
+    // ── Auth guard ────────────────────────────────────────────────────────────
+    // Authenticated employees: validated against their own tenant.
+    // Unauthenticated (self-registration flow): require a valid tenant slug
+    // header so anonymous uploads from random origins are blocked.
+    const session = await getSession()
+    if (!session) {
+      const slug = req.headers.get('x-tenant-slug')
+      const tenantId = slug ? await resolveTenantId(slug) : null
+      if (!tenantId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+    }
+
     const formData = await req.formData()
     const file = formData.get('file') as File | null
 

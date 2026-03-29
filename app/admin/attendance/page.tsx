@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { AttendanceTabs } from '@/components/attendance/AttendanceTabs'
 import { CalendarCheck } from 'lucide-react'
+import { parseBranding } from '@/lib/branding'
 
 export default async function AttendancePage() {
   const session = await getSession()
@@ -15,30 +16,41 @@ export default async function AttendancePage() {
 
   const today = new Date().toISOString().split('T')[0]
 
+  const tid = session.tenant_id
+
   const [
     { data: employees },
     { data: shifts },
     { data: todayRecords },
     { data: todayLeaves },
+    { data: companySettings },
   ] = await Promise.all([
     supabaseAdmin
       .from('employees')
       .select('id, first_name, last_name, employee_code, shift_id')
+      .eq('tenant_id', tid)
       .eq('is_active', true)
       .order('first_name'),
     supabaseAdmin
       .from('shifts')
       .select('id, name')
+      .eq('tenant_id', tid)
       .order('name'),
     supabaseAdmin
       .from('attendance')
       .select('employee_id, status')
+      .eq('tenant_id', tid)
       .eq('date', today),
     supabaseAdmin
       .from('leave_requests')
       .select('employee_id')
+      .eq('tenant_id', tid)
       .eq('status', 'approved')
       .or(`and(leave_date.eq.${today},end_date.is.null),and(leave_date.lte.${today},end_date.gte.${today})`),
+    supabaseAdmin
+      .from('company_settings')
+      .select('setting_key, setting_value')
+      .eq('tenant_id', tid),
   ])
 
   const todayAttendance: Record<string, string> = {}
@@ -49,16 +61,20 @@ export default async function AttendancePage() {
 
   const markedToday = Object.keys(todayAttendance).length
   const totalEmployees = (employees || []).length
+  const branding = parseBranding(companySettings || [])
 
   return (
     <div className="min-h-screen bg-zinc-950">
       {/* Top Bar */}
       <header className="border-b border-zinc-800 bg-zinc-900 px-4 sm:px-6 py-3 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-blue-600 rounded-md flex items-center justify-center shrink-0">
-            <span className="text-white font-bold text-xs">E</span>
+          <div
+            className="w-7 h-7 rounded-md flex items-center justify-center shrink-0"
+            style={{ backgroundColor: branding.color }}
+          >
+            <span className="text-white font-bold text-xs">{branding.initials}</span>
           </div>
-          <span className="font-semibold text-white text-sm">ESAM HR — Attendance</span>
+          <span className="font-semibold text-white text-sm">{branding.name} — Attendance</span>
         </div>
         <div className="flex items-center gap-3">
           <Badge variant="secondary" className="text-xs capitalize">{session.role.replace('_', ' ')}</Badge>

@@ -40,3 +40,40 @@ export async function sendWelcomeEmail(email: string, name: string): Promise<voi
     `,
   })
 }
+
+export async function sendTenantWelcomeEmail(
+  email: string,
+  adminName: string,
+  companyName: string,
+  slug: string
+): Promise<void> {
+  const portalUrl = `https://${slug}.hrjo.in`
+  await getResend().emails.send({
+    from: getFrom(),
+    to: email,
+    subject: `Your ${companyName} HR portal is ready — hrjo.in`,
+    html: `
+      <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px;background:#18181b;color:#fafafa;border-radius:12px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:24px;">
+          <div style="width:32px;height:32px;background:#7c3aed;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+            <span style="color:#fff;font-weight:700;font-size:14px;">H</span>
+          </div>
+          <span style="font-weight:600;color:#fafafa;font-size:16px;">hrjo.in</span>
+        </div>
+        <h2 style="margin:0 0 8px;color:#fafafa;font-size:22px;">Welcome, ${adminName}!</h2>
+        <p style="color:#a1a1aa;margin:0 0 24px;">Your <strong style="color:#fafafa;">${companyName}</strong> HR portal has been created and is ready to use.</p>
+        <div style="background:#27272a;border-radius:10px;padding:20px;margin-bottom:24px;">
+          <p style="color:#71717a;font-size:12px;margin:0 0 6px;text-transform:uppercase;letter-spacing:0.5px;">Your Portal URL</p>
+          <a href="${portalUrl}" style="color:#7c3aed;font-size:18px;font-weight:600;text-decoration:none;">${portalUrl}</a>
+        </div>
+        <a href="${portalUrl}/admin/dashboard" style="display:inline-block;background:#7c3aed;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
+          Open Admin Dashboard →
+        </a>
+        <p style="color:#52525b;margin-top:24px;font-size:12px;">
+          Your 30-day free trial has started. No credit card required.<br/>
+          Questions? Reply to this email.
+        </p>
+      </div>
+    `,
+  })
+}

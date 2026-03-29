@@ -9,6 +9,8 @@ import { SalaryEstimateWidget } from '@/components/employee/SalaryEstimateWidget
 import { HistoryTabs } from '@/components/employee/HistoryTabs'
 import { DashboardActions } from '@/components/employee/DashboardActions'
 import { CalendarDays, Wallet, Clock, FileText } from 'lucide-react'
+import { parseBranding } from '@/lib/branding'
+import { getSubscriptionInfo } from '@/lib/subscription'
 
 export default async function EmployeeDashboard() {
   const session = await getSession()
@@ -26,6 +28,19 @@ export default async function EmployeeDashboard() {
 
   if (['master_admin', 'manager', 'attendance'].includes(employee.role)) {
     redirect('/admin/dashboard')
+  }
+
+  // ── Subscription gate ─────────────────────────────────────────────────────
+  const { data: tenantRecord } = await supabaseAdmin
+    .from('tenants')
+    .select('plan, status, max_employees, trial_ends_at')
+    .eq('id', session.tenant_id)
+    .single()
+
+  if (tenantRecord) {
+    const subInfo = getSubscriptionInfo(tenantRecord)
+    if (subInfo.status === 'suspended') redirect('/suspended')
+    if (subInfo.status === 'trial_expired') redirect('/trial-expired')
   }
 
   const { data: shift } = employee.shift_id
@@ -49,6 +64,7 @@ export default async function EmployeeDashboard() {
     { data: tickets },
     { data: salaryHistory },
     { data: bonusHistory },
+    { data: companySettings },
   ] = await Promise.all([
     supabaseAdmin.from('attendance').select('date, status').eq('employee_id', employee.id).gte('date', firstDay).lte('date', lastDay),
     supabaseAdmin.from('leave_requests').select('*').eq('employee_id', employee.id).order('created_at', { ascending: false }),
@@ -56,10 +72,12 @@ export default async function EmployeeDashboard() {
     supabaseAdmin.from('support_tickets').select('*').eq('employee_id', employee.id).order('created_at', { ascending: false }),
     supabaseAdmin.from('salary_history').select('*').eq('employee_id', employee.id).order('created_at', { ascending: false }),
     supabaseAdmin.from('bonus_history').select('*').eq('employee_id', employee.id).order('created_at', { ascending: false }),
+    supabaseAdmin.from('company_settings').select('setting_key, setting_value').eq('tenant_id', session.tenant_id),
   ])
 
   const openTickets = (tickets || []).filter(t => t.status === 'open').length
   const hasPendingAdvance = (advances || []).some(a => a.status === 'pending')
+  const branding = parseBranding(companySettings || [])
 
   return (
     <div className="min-h-screen bg-zinc-950">
@@ -70,10 +88,13 @@ export default async function EmployeeDashboard() {
       {/* Top Bar */}
       <header className="border-b border-zinc-800 bg-zinc-900 px-4 sm:px-6 py-3 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-blue-600 rounded-md flex items-center justify-center shrink-0">
-            <span className="text-white font-bold text-xs">E</span>
+          <div
+            className="w-7 h-7 rounded-md flex items-center justify-center shrink-0"
+            style={{ backgroundColor: branding.color }}
+          >
+            <span className="text-white font-bold text-xs">{branding.initials}</span>
           </div>
-          <span className="font-semibold text-white text-sm hidden sm:inline">ESAM HR</span>
+          <span className="font-semibold text-white text-sm hidden sm:inline">{branding.name}</span>
         </div>
         <div className="flex items-center gap-3">
           <Badge variant="secondary" className="text-xs font-mono">{employee.employee_code || 'Pending'}</Badge>

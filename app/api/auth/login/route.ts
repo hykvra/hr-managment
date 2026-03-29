@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import { supabaseAdmin } from '@/lib/supabase'
 import { signToken, setAuthCookie } from '@/lib/auth'
 import { resolveTenantId } from '@/lib/tenant'
+import { getSubscriptionInfo } from '@/lib/subscription'
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,7 +18,30 @@ export async function POST(req: NextRequest) {
     const tenantId = await resolveTenantId(tenantSlug)
 
     if (!tenantId) {
-      return NextResponse.json({ error: 'Unknown workspace' }, { status: 400 })
+      return NextResponse.json({ error: 'Unknown workspace. Check your portal URL.' }, { status: 400 })
+    }
+
+    // ── Subscription gate ─────────────────────────────────────────────────────
+    const { data: tenantRecord } = await supabaseAdmin
+      .from('tenants')
+      .select('plan, status, max_employees, trial_ends_at')
+      .eq('id', tenantId)
+      .single()
+
+    if (tenantRecord) {
+      const subInfo = getSubscriptionInfo(tenantRecord)
+      if (subInfo.status === 'suspended') {
+        return NextResponse.json(
+          { error: 'This workspace has been suspended. Contact support@hrjo.in to resolve.' },
+          { status: 403 },
+        )
+      }
+      if (subInfo.status === 'trial_expired') {
+        return NextResponse.json(
+          { error: 'Your free trial has expired. Contact support@hrjo.in to upgrade and restore access.' },
+          { status: 403 },
+        )
+      }
     }
 
     const { data: employee, error } = await supabaseAdmin

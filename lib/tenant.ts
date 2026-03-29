@@ -7,15 +7,23 @@ export async function resolveTenantId(slug: string): Promise<string | null> {
   if (!slug) return null
   if (slugCache.has(slug)) return slugCache.get(slug)!
 
+  // Accept active + trial tenants; suspended/trial_expired are blocked
+  // downstream in the login route with a specific error message.
   const { data } = await supabaseAdmin
     .from('tenants')
-    .select('id')
+    .select('id, status')
     .eq('slug', slug)
-    .eq('status', 'active')
+    .in('status', ['active', 'trial'])
     .maybeSingle()
 
   if (!data?.id) return null
-  slugCache.set(slug, data.id as string)
+
+  // Only cache permanently-active tenants; trial tenants are re-checked
+  // on every login so their expiry is caught promptly.
+  if (data.status === 'active') {
+    slugCache.set(slug, data.id as string)
+  }
+
   return data.id as string
 }
 

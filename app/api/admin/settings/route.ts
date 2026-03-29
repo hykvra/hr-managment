@@ -17,7 +17,14 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'Invalid settings payload' }, { status: 400 })
   }
 
-  const validKeys = ['max_leaves_per_day', 'advance_max_percent', 'penalty_multiplier']
+  const validKeys = [
+    'max_leaves_per_day',
+    'advance_max_percent',
+    'penalty_multiplier',
+    'brand_name',
+    'brand_color',
+    'brand_initials',
+  ]
 
   for (const [key, value] of Object.entries(settings)) {
     if (!validKeys.includes(key)) continue

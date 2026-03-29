@@ -141,7 +141,15 @@ export default function RegisterPage() {
     const json = await res.json()
 
     if (!res.ok) {
-      setError(json.error || 'Registration failed')
+      if (res.status === 403) {
+        // Workspace is suspended or trial expired — surface a clear, actionable message
+        setError(`${json.error} Please contact your administrator or email support@hrjo.in.`)
+      } else if (res.status === 429) {
+        // Capacity limit reached
+        setError(`${json.error} Ask your administrator to upgrade the plan to add more employees.`)
+      } else {
+        setError(json.error || 'Registration failed. Please try again.')
+      }
       return
     }
 

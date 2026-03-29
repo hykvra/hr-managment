@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
+import { parseBranding } from '@/lib/branding'
 
 type CompanySetting = { setting_key: string; setting_value: string }
 
@@ -41,6 +42,8 @@ export function PolicySettings({ companySettings, managers }: Props) {
 
   // Company settings state
   const getSetting = (key: string) => companySettings.find(s => s.setting_key === key)?.setting_value || ''
+
+  // ── Policy settings ──────────────────────────────────────────────────────────
   const [settings, setSettings] = useState({
     max_leaves_per_day: getSetting('max_leaves_per_day'),
     advance_max_percent: getSetting('advance_max_percent'),
@@ -48,6 +51,45 @@ export function PolicySettings({ companySettings, managers }: Props) {
   })
   const [savingSettings, setSavingSettings] = useState(false)
   const [settingsMsg, setSettingsMsg] = useState('')
+
+  // ── Branding settings ────────────────────────────────────────────────────────
+  const initialBranding = parseBranding(companySettings)
+  const [brandName, setBrandName] = useState(getSetting('brand_name') || '')
+  const [brandColor, setBrandColor] = useState(getSetting('brand_color') || '#2563eb')
+  const [brandInitials, setBrandInitials] = useState(getSetting('brand_initials') || '')
+  const [savingBranding, setSavingBranding] = useState(false)
+  const [brandingMsg, setBrandingMsg] = useState('')
+
+  // Live preview — falls back to auto-initials when field is blank
+  const previewInitials = brandInitials.trim() || initialBranding.initials
+  const previewName = brandName.trim() || initialBranding.name
+
+  async function saveBranding() {
+    setSavingBranding(true); setBrandingMsg('')
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          settings: {
+            brand_name: brandName.trim(),
+            brand_color: brandColor,
+            brand_initials: brandInitials.trim().slice(0, 2).toUpperCase(),
+          },
+        }),
+      })
+      if (res.ok) {
+        setBrandingMsg('Saved — refresh the page to see the header update')
+        setTimeout(() => setBrandingMsg(''), 4000)
+        router.refresh()
+      } else {
+        const d = await res.json()
+        setBrandingMsg(d.error || 'Failed to save')
+      }
+    } finally {
+      setSavingBranding(false)
+    }
+  }
 
   async function saveSettings() {
     setSavingSettings(true); setSettingsMsg('')
@@ -107,6 +149,82 @@ export function PolicySettings({ companySettings, managers }: Props) {
 
   return (
     <div className="space-y-6">
+      {/* ── Branding ──────────────────────────────────────────────────────── */}
+      <div>
+        <p className="text-zinc-300 text-sm font-medium mb-3">Portal Branding</p>
+        <div className="bg-zinc-800 rounded-lg p-4 space-y-4">
+          {/* Live preview */}
+          <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 w-fit">
+            <div
+              className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 transition-colors"
+              style={{ backgroundColor: brandColor || '#2563eb' }}
+            >
+              <span className="text-white font-bold text-xs leading-none">
+                {previewInitials.slice(0, 2) || 'HR'}
+              </span>
+            </div>
+            <span className="text-white text-xs font-semibold">{previewName}</span>
+            <span className="text-zinc-500 text-xs ml-1">← live preview</span>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-zinc-300 text-xs">Company display name</Label>
+              <Input
+                value={brandName}
+                onChange={e => setBrandName(e.target.value)}
+                placeholder="e.g. Acme Corp"
+                className="bg-zinc-900 border-zinc-700 text-white h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-zinc-300 text-xs">Logo initials (1–2 chars)</Label>
+              <Input
+                value={brandInitials}
+                onChange={e => setBrandInitials(e.target.value.slice(0, 2))}
+                placeholder="Auto from name"
+                className="bg-zinc-900 border-zinc-700 text-white h-8 text-sm"
+                maxLength={2}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-zinc-300 text-xs">Brand colour</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={brandColor}
+                  onChange={e => setBrandColor(e.target.value)}
+                  className="w-9 h-8 rounded cursor-pointer border border-zinc-700 bg-zinc-900 p-0.5"
+                />
+                <Input
+                  value={brandColor}
+                  onChange={e => setBrandColor(e.target.value)}
+                  placeholder="#2563eb"
+                  className="bg-zinc-900 border-zinc-700 text-white h-8 text-sm w-28 font-mono"
+                  maxLength={7}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 pt-1">
+            <Button size="sm" disabled={savingBranding} onClick={saveBranding} className="text-xs">
+              {savingBranding ? 'Saving…' : 'Save Branding'}
+            </Button>
+            {brandingMsg && (
+              <span className={`text-xs ${brandingMsg.startsWith('Failed') ? 'text-red-400' : 'text-green-400'}`}>
+                {brandingMsg}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <Separator className="bg-zinc-700" />
+
       {/* Company Settings */}
       <div>
         <p className="text-zinc-300 text-sm font-medium mb-3">Leave & Payroll Policy</p>

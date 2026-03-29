@@ -115,10 +115,11 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-3">
-            <span className="text-white font-bold text-xl">E</span>
+          <div className="w-12 h-12 bg-violet-600 rounded-xl flex items-center justify-center mx-auto mb-3">
+            <span className="text-white font-bold text-xl">H</span>
           </div>
-          <h1 className="text-xl font-bold text-white">ESAM HR Portal</h1>
+          <h1 className="text-xl font-bold text-white">hrjo.in HR Portal</h1>
+          <p className="text-zinc-500 text-xs mt-1">Sign in to your workspace</p>
         </div>
 
         {/* ── Login Card ── */}

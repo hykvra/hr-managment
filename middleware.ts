@@ -8,6 +8,9 @@ const PUBLIC_PATHS = [
   '/',
   '/login',
   '/register',
+  '/signup',
+  '/suspended',
+  '/trial-expired',
   '/api/auth/login',
   '/api/auth/logout',
   '/api/auth/register',
@@ -53,6 +56,11 @@ export async function middleware(req: NextRequest) {
 
   // Super admin API routes self-authenticate via getSuperSession()
   if (pathname.startsWith('/api/super-admin/')) {
+    return NextResponse.next({ request: { headers: baseHeaders } })
+  }
+
+  // Public API routes — no auth required
+  if (pathname.startsWith('/api/public/')) {
     return NextResponse.next({ request: { headers: baseHeaders } })
   }
 

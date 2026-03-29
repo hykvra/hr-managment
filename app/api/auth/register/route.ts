@@ -6,6 +6,7 @@ const bcrypt = (bcryptjs as any).default ?? bcryptjs
 import { supabaseAdmin } from '@/lib/supabase'
 import { sendWelcomeEmail } from '@/lib/mailer'
 import { resolveTenantId } from '@/lib/tenant'
+import { getSubscriptionInfo } from '@/lib/subscription'
 
 export async function POST(req: NextRequest) {
   try {
@@ -50,6 +51,37 @@ export async function POST(req: NextRequest) {
 
     if (!tenantId) {
       return NextResponse.json({ error: 'Unknown workspace' }, { status: 400 })
+    }
+
+    // ── Subscription & capacity checks ────────────────────────────────────────
+    const { data: tenantRecord } = await supabaseAdmin
+      .from('tenants')
+      .select('plan, status, max_employees, trial_ends_at')
+      .eq('id', tenantId)
+      .single()
+
+    if (tenantRecord) {
+      const subInfo = getSubscriptionInfo(tenantRecord)
+      if (subInfo.isRestricted) {
+        return NextResponse.json(
+          { error: 'This workspace is not currently accepting new registrations.' },
+          { status: 403 },
+        )
+      }
+
+      const { count: activeCount } = await supabaseAdmin
+        .from('employees')
+        .select('*', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId)
+        .eq('is_active', true)
+        .neq('role', 'master_admin')
+
+      if (activeCount !== null && activeCount >= tenantRecord.max_employees) {
+        return NextResponse.json(
+          { error: 'Employee limit reached for this workspace. Please contact your administrator.' },
+          { status: 429 },
+        )
+      }
     }
 
     // Check email uniqueness within tenant
