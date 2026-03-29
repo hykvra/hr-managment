@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import bcrypt from 'bcryptjs'
+import bcryptjs from 'bcryptjs'
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const bcrypt = (bcryptjs as any).default ?? bcryptjs
 import { supabaseAdmin } from '@/lib/supabase'
 import { signToken, setAuthCookie } from '@/lib/auth'
 import { resolveTenantId } from '@/lib/tenant'
