@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Building2, Palette, Globe, Rocket, Check, Loader2, ChevronRight, ChevronLeft } from 'lucide-react'
+import { Palette, Globe, Rocket, Check, Loader2, ChevronRight, ChevronLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'

@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, TrendingUp, Gift, RefreshCw, UserX, ChevronDown, X } from 'lucide-react'
@@ -187,7 +188,7 @@ export function EmployeeManagement() {
                 {/* Avatar */}
                 <div className="w-8 h-8 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center shrink-0 text-blue-400 font-bold text-xs">
                   {emp.profile_photo
-                    ? <img src={emp.profile_photo} alt="" className="w-full h-full rounded-full object-cover" />
+                    ? <Image src={emp.profile_photo} alt="" width={32} height={32} className="w-full h-full rounded-full object-cover" />
                     : `${emp.first_name[0]}${emp.last_name[0]}`}
                 </div>
 
