@@ -28,7 +28,7 @@ async function main() {
   // Resolve tenant
   const { data: tenant, error: tenantErr } = await supabase
     .from('tenants')
-    .select('id, name')
+    .select('id, company_name')
     .eq('slug', tenantSlug)
     .single()
 
@@ -37,7 +37,7 @@ async function main() {
     process.exit(1)
   }
 
-  console.log(`\nTenant: ${tenant.name} (${tenant.id})\n`)
+  console.log(`\nTenant: ${tenant.company_name} (${tenant.id})\n`)
 
   // Load active employees (skip attendance-only role)
   const { data: employees, error: empErr } = await supabase
