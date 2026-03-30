@@ -17,6 +17,7 @@ type Device = {
   username: string
   is_active: boolean
   push_enabled: boolean
+  proxy_url: string | null
   last_sync_at: string | null
   last_event_at: string | null
 }
@@ -47,10 +48,11 @@ type DeviceForm = {
   port: string
   username: string
   password: string
+  proxy_url: string
 }
 
 const BLANK_FORM: DeviceForm = {
-  device_name: '', ip_address: '', port: '80', username: 'admin', password: '',
+  device_name: '', ip_address: '', port: '80', username: 'admin', password: '', proxy_url: '',
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -87,7 +89,7 @@ function DeviceModal({
 }: { initial?: Device | null; onSave: () => void; onClose: () => void }) {
   const [form, setForm] = useState<DeviceForm>(
     initial
-      ? { device_name: initial.device_name, ip_address: initial.ip_address, port: String(initial.port), username: initial.username, password: '' }
+      ? { device_name: initial.device_name, ip_address: initial.ip_address, port: String(initial.port), username: initial.username, password: '', proxy_url: initial.proxy_url ?? '' }
       : BLANK_FORM
   )
   const [saving, setSaving] = useState(false)
@@ -106,6 +108,7 @@ function DeviceModal({
         ip_address:  form.ip_address.trim(),
         port:        Number(form.port),
         username:    form.username.trim(),
+        proxy_url:   form.proxy_url.trim(),
       }
       if (form.password) body.password = form.password
 
@@ -141,6 +144,7 @@ function DeviceModal({
             { label: 'Port',        key: 'port'        as const, placeholder: '80' },
             { label: 'Username',    key: 'username'    as const, placeholder: 'admin' },
             { label: initial ? 'Password (leave blank to keep)' : 'Password', key: 'password' as const, placeholder: '••••••••', type: 'password', required: !initial },
+            { label: 'Local Proxy URL', key: 'proxy_url' as const, placeholder: 'https://xxxx.ngrok.io' },
           ].map(f => (
             <div key={f.key}>
               <label className="block text-xs text-zinc-400 mb-1">{f.label}</label>
@@ -346,6 +350,11 @@ function DeviceCard({
                 <Radio className="w-2.5 h-2.5" /> Push
               </span>
             )}
+            {device.proxy_url ? (
+              <span className="flex items-center gap-1 text-[10px] bg-emerald-900/40 text-emerald-400 px-1.5 py-0.5 rounded-full">
+                🔗 Proxy: {new URL(device.proxy_url).hostname.replace(/^[^.]+\./, '').replace(/\.io$/, '.io')}
+              </span>
+            ) : null}
             {!device.is_active && (
               <span className="text-[10px] bg-zinc-800 text-zinc-500 px-1.5 py-0.5 rounded-full">Inactive</span>
             )}
@@ -405,6 +414,25 @@ function DeviceCard({
       {/* Expanded pane */}
       {expanded && (
         <div className="border-t border-zinc-800 px-4 py-3 space-y-3">
+          {/* Proxy setup guide / status */}
+          {!device.proxy_url ? (
+            <div className="bg-amber-950/40 border border-amber-800/40 rounded-lg p-3 text-xs text-amber-300 space-y-1">
+              <p className="font-medium flex items-center gap-1.5">⚠️ App is deployed remotely — direct device calls won&apos;t work.</p>
+              <p className="text-amber-300/70">Run the local proxy from your office machine:</p>
+              <ol className="list-decimal ml-4 space-y-0.5 text-amber-300/80">
+                <li><code className="bg-amber-900/40 px-1 rounded">npm run hik-proxy</code></li>
+                <li><code className="bg-amber-900/40 px-1 rounded">npx ngrok http 3001</code></li>
+                <li>Copy the <strong>https://xxxx.ngrok.io</strong> URL</li>
+                <li>Edit this device → paste it as &ldquo;Local Proxy URL&rdquo;</li>
+              </ol>
+              <p className="text-amber-300/70 pt-0.5">Then all buttons (Test, Sync, Push Config) will work.</p>
+            </div>
+          ) : (
+            <div className="bg-emerald-950/40 border border-emerald-800/40 rounded-lg px-3 py-2 text-xs text-emerald-400 flex items-center gap-2">
+              🔗 Proxy connected: <span className="font-mono">{device.proxy_url}</span>
+            </div>
+          )}
+
           {/* Action buttons */}
           <div className="flex flex-wrap gap-2">
             <button

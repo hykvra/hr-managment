@@ -21,6 +21,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (body.password     !== undefined) updates.password_enc = encryptText(body.password)
   if (body.is_active    !== undefined) updates.is_active    = body.is_active
   if (body.push_enabled !== undefined) updates.push_enabled = body.push_enabled
+  if (body.proxy_url   !== undefined) updates.proxy_url   = body.proxy_url === '' ? null : body.proxy_url
 
   const { error } = await supabaseAdmin
     .from('hikvision_devices')

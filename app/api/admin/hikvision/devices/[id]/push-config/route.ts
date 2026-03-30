@@ -9,6 +9,7 @@ import { getSession } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { decryptText } from '@/lib/crypto'
 import { hikConfigurePush } from '@/lib/hikvision'
+import { forwardToProxy } from '@/lib/hik-forward'
 
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession()
@@ -19,12 +20,28 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
   const { data: device } = await supabaseAdmin
     .from('hikvision_devices')
-    .select('id, ip_address, port, username, password_enc')
+    .select('id, ip_address, port, username, password_enc, proxy_url')
     .eq('id', params.id)
     .eq('tenant_id', tenantId)
     .single()
 
   if (!device) return NextResponse.json({ error: 'Device not found' }, { status: 404 })
+
+  // Build the push URL from the app URL
+  const appUrl = process.env.NEXTAUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  const pushUrl = `${appUrl}/api/integrations/hikvision/push`
+
+  // Forward through local proxy if device has proxy_url configured
+  if (device.proxy_url && process.env.HIK_PROXY_SECRET) {
+    const proxied = await forwardToProxy(
+      device.proxy_url,
+      process.env.HIK_PROXY_SECRET,
+      '/configure-push',
+      { device_id: params.id, push_url: pushUrl },
+    )
+    const data = await proxied.json()
+    return NextResponse.json(data, { status: proxied.status })
+  }
 
   const dev = {
     ip:       device.ip_address,
@@ -32,10 +49,6 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     username: device.username,
     password: decryptText(device.password_enc),
   }
-
-  // Build the push URL from the request host
-  const appUrl = process.env.NEXTAUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
-  const pushUrl = `${appUrl}/api/integrations/hikvision/push`
 
   try {
     await hikConfigurePush(dev, pushUrl)

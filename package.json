@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "seed": "tsx --env-file=.env.local scripts/seed.ts"
+    "seed": "tsx --env-file=.env.local scripts/seed.ts",
+    "hik-sync": "tsx --env-file=.env.local scripts/hik-sync.ts",
+    "hik-proxy": "tsx --env-file=.env.local scripts/hik-proxy.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1019.0",
