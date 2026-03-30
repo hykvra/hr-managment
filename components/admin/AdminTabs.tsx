@@ -157,7 +157,7 @@ function SidebarNav({
   }
 
   return (
-    <div className={`flex flex-col h-full bg-zinc-950 border-r border-zinc-800 transition-all duration-200 ${
+    <div className={`flex flex-col h-full bg-zinc-950/60 border-r border-zinc-800 transition-all duration-200 ${
       collapsed && !mobile ? 'w-12' : 'w-52'
     }`}>
       {/* Collapse toggle (desktop) */}
@@ -291,53 +291,51 @@ export function AdminTabs({
   const activeLabel = TAB_CONFIG.find(t => t.id === active)?.label ?? ''
 
   return (
-    <div className="flex gap-0 min-h-[600px]">
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+      <div className="flex min-h-[600px] relative">
 
-      {/* ── Mobile hamburger ── */}
-      <div className="md:hidden flex items-center gap-2 absolute top-3 left-3 z-20">
-        <button
-          onClick={() => setMobileOpen(true)}
-          className="p-2 rounded-lg bg-zinc-800 text-zinc-300 hover:text-white"
-        >
-          <Menu className="w-4 h-4" />
-        </button>
-        <span className="text-sm font-medium text-zinc-200">{activeLabel}</span>
-      </div>
-
-      {/* ── Mobile overlay ── */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-30 flex md:hidden">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setMobileOpen(false)} />
-          <div className="relative z-40 flex flex-col h-full">
-            <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800 bg-zinc-950">
-              <span className="text-xs font-semibold text-zinc-300">Navigation</span>
-              <button onClick={() => setMobileOpen(false)} className="p-1 text-zinc-400 hover:text-white">
-                <X className="w-4 h-4" />
-              </button>
+        {/* ── Mobile overlay ── */}
+        {mobileOpen && (
+          <div className="fixed inset-0 z-30 flex md:hidden">
+            <div className="absolute inset-0 bg-black/60" onClick={() => setMobileOpen(false)} />
+            <div className="relative z-40 flex flex-col h-full">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800 bg-zinc-950">
+                <span className="text-xs font-semibold text-zinc-300">Navigation</span>
+                <button onClick={() => setMobileOpen(false)} className="p-1 text-zinc-400 hover:text-white">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <SidebarNav
+                visibleTabs={visibleTabs} counts={counts}
+                active={active} setActive={setActive}
+                collapsed={false} setCollapsed={() => {}}
+                mobile onClose={() => setMobileOpen(false)}
+              />
             </div>
-            <SidebarNav
-              visibleTabs={visibleTabs} counts={counts}
-              active={active} setActive={setActive}
-              collapsed={false} setCollapsed={() => {}}
-              mobile onClose={() => setMobileOpen(false)}
-            />
           </div>
+        )}
+
+        {/* ── Desktop sidebar ── */}
+        <div className="hidden md:flex shrink-0">
+          <SidebarNav
+            visibleTabs={visibleTabs} counts={counts}
+            active={active} setActive={setActive}
+            collapsed={collapsed} setCollapsed={setCollapsed}
+          />
         </div>
-      )}
 
-      {/* ── Desktop sidebar ── */}
-      <div className="hidden md:flex shrink-0">
-        <SidebarNav
-          visibleTabs={visibleTabs} counts={counts}
-          active={active} setActive={setActive}
-          collapsed={collapsed} setCollapsed={setCollapsed}
-        />
-      </div>
-
-      {/* ── Content ── */}
-      <div className="flex-1 min-w-0 pl-4 pt-1 md:pt-0">
-        {/* Mobile spacer for hamburger */}
-        <div className="h-10 md:hidden" />
+        {/* ── Content ── */}
+        <div className="flex-1 min-w-0 p-4">
+          {/* Mobile header inside box */}
+          <div className="flex items-center gap-2 mb-3 md:hidden">
+            <button
+              onClick={() => setMobileOpen(true)}
+              className="p-1.5 bg-zinc-800 rounded-lg text-zinc-400 hover:text-white"
+            >
+              <Menu className="w-4 h-4" />
+            </button>
+            <span className="text-sm font-medium text-zinc-200">{activeLabel}</span>
+          </div>
 
         {active === 'approvals'    && <EmployeeApprovals pendingEmployees={pendingEmployees} shifts={shifts} />}
         {active === 'employees'    && <EmployeeManagement />}
@@ -360,7 +358,8 @@ export function AdminTabs({
         {active === 'reports'      && <Reports />}
         {active === 'settings'     && <PolicySettings companySettings={companySettings} managers={managers} />}
         {active === 'billing'      && <BillingPanel />}
-      </div>
-    </div>
+        </div>{/* end content */}
+      </div>{/* end flex row */}
+    </div> /* end card box */
   )
 }
