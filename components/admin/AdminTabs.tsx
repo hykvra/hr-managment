@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Users, CalendarCheck, Banknote, Ticket, Clock, Megaphone, Settings, Wallet, UserCog, BarChart2, CreditCard, HandCoins, Building2, Receipt, AlertTriangle, Upload, Activity, Star, CalendarDays, LogOut } from 'lucide-react'
+import { Users, CalendarCheck, Banknote, Ticket, Clock, Megaphone, Settings, Wallet, UserCog, BarChart2, CreditCard, HandCoins, Building2, Receipt, AlertTriangle, Upload, Activity, Star, CalendarDays, LogOut, Cpu } from 'lucide-react'
 import { EmployeeApprovals } from './EmployeeApprovals'
 import { LeaveManagement } from './LeaveManagement'
 import { AdvanceManagement } from './AdvanceManagement'
@@ -22,6 +22,7 @@ import { ActivityLogViewer } from './ActivityLogViewer'
 import { PerformanceReviews } from './PerformanceReviews'
 import { LeaveBalancesPanel } from './LeaveBalancesPanel'
 import { ResignationManagement } from './ResignationManagement'
+import { HikvisionPanel } from './HikvisionPanel'
 
 // ── Data types ────────────────────────────────────────────────────────────────
 
@@ -97,6 +98,7 @@ const TAB_CONFIG = [
   { id: 'leave_balances', label: 'Leave Bal',   Icon: CalendarDays,  masterOnly: true  },
   { id: 'performance',   label: 'Reviews',     Icon: Star,          masterOnly: true  },
   { id: 'activity_log',  label: 'Audit Log',   Icon: Activity,      masterOnly: true  },
+  { id: 'hikvision',     label: 'Hikvision',   Icon: Cpu,           masterOnly: true  },
   { id: 'reports',       label: 'Reports',     Icon: BarChart2,     masterOnly: true  },
   { id: 'settings',      label: 'Settings',    Icon: Settings,      masterOnly: true  },
   { id: 'billing',     label: 'Billing',    Icon: CreditCard,    masterOnly: true  },
@@ -213,6 +215,9 @@ export function AdminTabs({
         )}
         {active === 'activity_log' && (
           <ActivityLogViewer />
+        )}
+        {active === 'hikvision' && (
+          <HikvisionPanel />
         )}
         {active === 'payroll' && (
           <PayrollRun />
