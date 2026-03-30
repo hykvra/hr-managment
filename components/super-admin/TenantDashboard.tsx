@@ -9,7 +9,7 @@ import {
   Plus, Edit2, Users, CheckCircle2, Clock, XCircle,
   ExternalLink, Loader2, Building2, Globe, Shield, UserPlus, ChevronRight, X,
   Trash2, Activity, AlertTriangle, RefreshCw, UserCheck, Settings2,
-  Search, Filter, LogIn, LogOut, CreditCard, Calendar, TrendingUp, FileText
+  Search, Filter, LogIn, LogOut, CreditCard, Calendar, TrendingUp, FileText,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -402,56 +402,88 @@ export function TenantDashboard({ tenants: initial, superAdminName }: Props) {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+      <main className="flex min-h-[calc(100vh-52px)]">
+
+        {/* ── Sidebar ── */}
+        <aside className="w-52 shrink-0 border-r border-zinc-800 bg-zinc-900/50 pt-6 px-2 flex flex-col gap-1 hidden sm:flex">
+          {/* Label */}
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-600 px-2 mb-1">Navigation</p>
+
+          <button
+            onClick={() => setActiveTab('tenants')}
+            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors w-full text-left ${
+              activeTab === 'tenants'
+                ? 'bg-violet-600/15 text-violet-400 border-l-2 border-violet-500'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
+            }`}
+          >
+            <Building2 className="w-4 h-4 shrink-0" />
+            Tenants
+            <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+              activeTab === 'tenants' ? 'bg-violet-500 text-white' : 'bg-zinc-700 text-zinc-400'
+            }`}>{tenants.length}</span>
+          </button>
+
+          <button
+            onClick={() => { setActiveTab('logs'); if (logs.length === 0) fetchLogs() }}
+            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors w-full text-left ${
+              activeTab === 'logs'
+                ? 'bg-violet-600/15 text-violet-400 border-l-2 border-violet-500'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
+            }`}
+          >
+            <Activity className="w-4 h-4 shrink-0" />
+            Activity Log
+          </button>
+        </aside>
+
+        {/* ── Main content ── */}
+        <div className="flex-1 min-w-0 px-4 sm:px-6 py-6 space-y-6 overflow-y-auto">
+
         {/* Title row */}
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-xl font-bold text-white">Super Admin</h1>
+            <h1 className="text-xl font-bold text-white">
+              {activeTab === 'tenants' ? 'Tenants' : 'Activity Log'}
+            </h1>
             <p className="text-zinc-400 text-xs mt-0.5">Manage all client workspaces on hrjo.in</p>
           </div>
-          {activeTab === 'tenants' && (
-            <Button
-              onClick={() => { setShowCreate(true); setApiError('') }}
-              className="bg-violet-600 hover:bg-violet-700 text-white text-xs gap-1.5 shrink-0"
-              size="sm"
-            >
-              <Plus className="w-3.5 h-3.5" /> New Tenant
-            </Button>
-          )}
-          {activeTab === 'logs' && (
-            <Button
-              onClick={() => fetchLogs()}
-              variant="outline"
-              className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 text-xs gap-1.5 shrink-0"
-              size="sm"
-            >
-              <RefreshCw className="w-3.5 h-3.5" /> Refresh
-            </Button>
-          )}
-        </div>
-
-        {/* Tabs */}
-        <div className="flex items-center gap-1 border-b border-zinc-800">
-          <button
-            onClick={() => setActiveTab('tenants')}
-            className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium transition-colors border-b-2 -mb-px ${
-              activeTab === 'tenants'
-                ? 'border-violet-500 text-violet-400'
-                : 'border-transparent text-zinc-500 hover:text-zinc-300'
-            }`}
-          >
-            <Building2 className="w-3.5 h-3.5" /> Tenants
-          </button>
-          <button
-            onClick={() => { setActiveTab('logs'); if (logs.length === 0) fetchLogs() }}
-            className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium transition-colors border-b-2 -mb-px ${
-              activeTab === 'logs'
-                ? 'border-violet-500 text-violet-400'
-                : 'border-transparent text-zinc-500 hover:text-zinc-300'
-            }`}
-          >
-            <Activity className="w-3.5 h-3.5" /> Activity Log
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Mobile nav toggle */}
+            <div className="sm:hidden flex gap-1 border border-zinc-700 rounded-lg overflow-hidden">
+              <button
+                onClick={() => setActiveTab('tenants')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${activeTab === 'tenants' ? 'bg-violet-600 text-white' : 'text-zinc-400'}`}
+              >
+                <Building2 className="w-3.5 h-3.5" /> Tenants
+              </button>
+              <button
+                onClick={() => { setActiveTab('logs'); if (logs.length === 0) fetchLogs() }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${activeTab === 'logs' ? 'bg-violet-600 text-white' : 'text-zinc-400'}`}
+              >
+                <Activity className="w-3.5 h-3.5" /> Logs
+              </button>
+            </div>
+            {activeTab === 'tenants' && (
+              <Button
+                onClick={() => { setShowCreate(true); setApiError('') }}
+                className="bg-violet-600 hover:bg-violet-700 text-white text-xs gap-1.5 shrink-0"
+                size="sm"
+              >
+                <Plus className="w-3.5 h-3.5" /> New Tenant
+              </Button>
+            )}
+            {activeTab === 'logs' && (
+              <Button
+                onClick={() => fetchLogs()}
+                variant="outline"
+                className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 text-xs gap-1.5 shrink-0"
+                size="sm"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Refresh
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* ── Tenants Tab ───────────────────────────────────────────────────── */}
@@ -704,6 +736,7 @@ export function TenantDashboard({ tenants: initial, superAdminName }: Props) {
             </Card>
           </div>
         )}
+        </div>{/* end flex-1 content */}
       </main>
 
       {/* ── Delete Confirmation Modal ──────────────────────────────────────── */}

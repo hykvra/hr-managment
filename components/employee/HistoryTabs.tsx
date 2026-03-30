@@ -1,11 +1,16 @@
 'use client'
 
 import { useState } from 'react'
-import { Printer } from 'lucide-react'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Printer, CalendarCheck, Banknote, Wallet, Gift, Ticket,
+  HandCoins, Receipt, AlertTriangle, Clock, Star,
+  ChevronDown, ChevronRight, Menu, X, LucideIcon,
+} from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import type { LeaveRequest, SalaryAdvance, SupportTicket, SalaryHistoryRecord, BonusHistoryRecord } from '@/types'
+
+// ── Payslip types + helpers ───────────────────────────────────────────────────
 
 type Payslip = {
   id: string; month: string; base_salary: number
@@ -68,6 +73,8 @@ function printPayslip(p: Payslip) {
   else URL.revokeObjectURL(url)
 }
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+
 interface Props {
   leaveRequests: LeaveRequest[]
   advances: SalaryAdvance[]
@@ -100,208 +107,265 @@ const EmptyState = ({ text }: { text: string }) => (
 )
 
 type LoanItem = {
-  id: string
-  amount: number
-  reason: string
-  emi_amount: number
-  disbursed_on: string
-  months_total: number
-  months_paid: number
-  status: string
+  id: string; amount: number; reason: string; emi_amount: number
+  disbursed_on: string; months_total: number; months_paid: number; status: string
 }
 
 type ExpenseItem = {
-  id: string
-  amount: number
-  category: string
-  description: string
-  status: string
-  approved_amount: number | null
-  manager_note: string | null
-  created_at: string
+  id: string; amount: number; category: string; description: string
+  status: string; approved_amount: number | null; manager_note: string | null; created_at: string
 }
 
 const EXPENSE_ICON: Record<string, string> = {
   Travel: '✈️', Food: '🍽️', Medical: '🏥', Equipment: '🖥️', Accommodation: '🏨', Other: '📎',
 }
 
+// ── Nav config ────────────────────────────────────────────────────────────────
+
+type TabId = 'leaves' | 'regularize' | 'salary' | 'bonuses' | 'payslips' | 'advances' | 'loans' | 'expenses' | 'tickets' | 'warnings' | 'reviews'
+
+type TabDef = { id: TabId; label: string; Icon: LucideIcon }
+
+const ALL_TABS: TabDef[] = [
+  { id: 'leaves',     label: 'Leaves',          Icon: CalendarCheck },
+  { id: 'regularize', label: 'Regularizations',  Icon: Clock         },
+  { id: 'salary',     label: 'Salary History',   Icon: Wallet        },
+  { id: 'bonuses',    label: 'Bonuses',          Icon: Gift          },
+  { id: 'payslips',   label: 'Payslips',         Icon: Printer       },
+  { id: 'advances',   label: 'Advances',         Icon: Banknote      },
+  { id: 'loans',      label: 'Loans',            Icon: HandCoins     },
+  { id: 'expenses',   label: 'Expenses',         Icon: Receipt       },
+  { id: 'tickets',    label: 'Tickets',          Icon: Ticket        },
+  { id: 'warnings',   label: 'Warnings',         Icon: AlertTriangle },
+  { id: 'reviews',    label: 'Reviews',          Icon: Star          },
+]
+
+type NavGroup = { id: string; label: string; Icon: LucideIcon; tabIds: TabId[] }
+
+const NAV_GROUPS: NavGroup[] = [
+  { id: 'time',    label: 'Leave & Time', Icon: CalendarCheck, tabIds: ['leaves', 'regularize'] },
+  { id: 'earn',    label: 'Earnings',     Icon: Wallet,        tabIds: ['salary', 'bonuses', 'payslips'] },
+  { id: 'finance', label: 'Finance',      Icon: Banknote,      tabIds: ['advances', 'loans', 'expenses'] },
+  { id: 'hr',      label: 'HR',           Icon: Star,          tabIds: ['tickets', 'warnings', 'reviews'] },
+]
+
+// ── Sidebar ───────────────────────────────────────────────────────────────────
+
+function EmployeeSidebar({
+  active, setActive, counts, onClose,
+}: {
+  active: TabId
+  setActive: (id: TabId) => void
+  counts: Partial<Record<TabId, number>>
+  onClose?: () => void
+}) {
+  const tabMap = Object.fromEntries(ALL_TABS.map(t => [t.id, t])) as Record<TabId, TabDef>
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(
+    () => Object.fromEntries(NAV_GROUPS.map(g => [g.id, true]))
+  )
+
+  function toggle(id: string) { setOpenGroups(s => ({ ...s, [id]: !s[id] })) }
+
+  function select(id: TabId) { setActive(id); onClose?.() }
+
+  return (
+    <nav className="w-44 shrink-0 overflow-y-auto py-1">
+      {NAV_GROUPS.map(group => {
+        const isOpen = openGroups[group.id]
+        const hasActive = group.tabIds.includes(active)
+        return (
+          <div key={group.id}>
+            <button
+              onClick={() => toggle(group.id)}
+              className={`w-full flex items-center justify-between px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide transition-colors ${
+                hasActive ? 'text-blue-400' : 'text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <group.Icon className="w-3 h-3" /> {group.label}
+              </span>
+              {isOpen ? <ChevronDown className="w-2.5 h-2.5" /> : <ChevronRight className="w-2.5 h-2.5" />}
+            </button>
+
+            {isOpen && group.tabIds.map(tabId => {
+              const t = tabMap[tabId]
+              if (!t) return null
+              const count = counts[tabId]
+              const isActive = active === tabId
+              return (
+                <button
+                  key={tabId}
+                  onClick={() => select(tabId)}
+                  className={`w-full flex items-center gap-2 pl-5 pr-2 py-1.5 text-xs transition-colors rounded-r-md ${
+                    isActive
+                      ? 'bg-blue-600/15 text-blue-400 border-l-2 border-blue-500 pl-[18px]'
+                      : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 border-l-2 border-transparent pl-[18px]'
+                  }`}
+                >
+                  <t.Icon className="w-3 h-3 shrink-0" />
+                  <span className="flex-1 text-left truncate">{t.label}</span>
+                  {count !== undefined && count > 0 && (
+                    <span className={`text-[9px] px-1 py-0.5 rounded-full font-bold ${
+                      isActive ? 'bg-blue-500 text-white' : 'bg-zinc-700 text-zinc-300'
+                    }`}>{count}</span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        )
+      })}
+    </nav>
+  )
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
 export function HistoryTabs({ leaveRequests, advances, tickets, salaryHistory, bonusHistory }: Props) {
-  const [payslips, setPayslips] = useState<Payslip[]>([])
-  const [payslipsLoaded, setPayslipsLoaded] = useState(false)
-  const [payslipsLoading, setPayslipsLoading] = useState(false)
+  const [payslips,         setPayslips]         = useState<Payslip[]>([])
+  const [payslipsLoaded,   setPayslipsLoaded]   = useState(false)
+  const [payslipsLoading,  setPayslipsLoading]  = useState(false)
 
-  const [loans, setLoans]             = useState<LoanItem[]>([])
-  const [loansLoaded, setLoansLoaded] = useState(false)
-  const [loansLoading, setLoansLoading] = useState(false)
+  const [loans,            setLoans]            = useState<LoanItem[]>([])
+  const [loansLoaded,      setLoansLoaded]      = useState(false)
+  const [loansLoading,     setLoansLoading]     = useState(false)
 
-  const [expenses, setExpenses]             = useState<ExpenseItem[]>([])
-  const [expensesLoaded, setExpensesLoaded] = useState(false)
-  const [expensesLoading, setExpensesLoading] = useState(false)
+  const [expenses,         setExpenses]         = useState<ExpenseItem[]>([])
+  const [expensesLoaded,   setExpensesLoaded]   = useState(false)
+  const [expensesLoading,  setExpensesLoading]  = useState(false)
 
-  const [warnings, setWarnings]             = useState<{ id: string; warning_type: string; subject: string; description: string; issued_on: string; acknowledged_at: string | null }[]>([])
-  const [warningsLoaded, setWarningsLoaded] = useState(false)
-  const [warningsLoading, setWarningsLoading] = useState(false)
+  const [warnings,         setWarnings]         = useState<{ id: string; warning_type: string; subject: string; description: string; issued_on: string; acknowledged_at: string | null }[]>([])
+  const [warningsLoaded,   setWarningsLoaded]   = useState(false)
+  const [warningsLoading,  setWarningsLoading]  = useState(false)
 
-  const [regularizations, setRegularizations] = useState<{ id: string; date: string; requested_status: string; reason: string; status: string; manager_note: string | null }[]>([])
-  const [regsLoaded, setRegsLoaded]           = useState(false)
-  const [regsLoading, setRegsLoading]         = useState(false)
+  const [regularizations,  setRegularizations]  = useState<{ id: string; date: string; requested_status: string; reason: string; status: string; manager_note: string | null }[]>([])
+  const [regsLoaded,       setRegsLoaded]       = useState(false)
+  const [regsLoading,      setRegsLoading]      = useState(false)
 
   type ReviewItem = {
-    id: string
-    review_period: string
-    period_start: string
-    period_end: string
-    overall_rating: number | null
-    performance_rating: number | null
-    attendance_rating: number | null
-    behavior_rating: number | null
-    strengths: string | null
-    improvements: string | null
-    goals: string | null
-    comments: string | null
-    created_at: string
+    id: string; review_period: string; period_start: string; period_end: string
+    overall_rating: number | null; performance_rating: number | null
+    attendance_rating: number | null; behavior_rating: number | null
+    strengths: string | null; improvements: string | null; goals: string | null
+    comments: string | null; created_at: string
     reviewer: { first_name: string; last_name: string } | null
   }
-  const [reviews, setReviews]           = useState<ReviewItem[]>([])
-  const [reviewsLoaded, setReviewsLoaded] = useState(false)
-  const [reviewsLoading, setReviewsLoading] = useState(false)
+  const [reviews,          setReviews]          = useState<ReviewItem[]>([])
+  const [reviewsLoaded,    setReviewsLoaded]    = useState(false)
+  const [reviewsLoading,   setReviewsLoading]   = useState(false)
+
+  const [active,    setActive]    = useState<TabId>('leaves')
+  const [mobileNav, setMobileNav] = useState(false)
 
   async function loadPayslips() {
     if (payslipsLoaded) return
     setPayslipsLoading(true)
     try {
       const res = await fetch('/api/employees/payslip')
-      if (res.ok) {
-        const { payslips: data } = await res.json() as { payslips: Payslip[] }
-        setPayslips(data)
-        setPayslipsLoaded(true)
-      }
-    } finally {
-      setPayslipsLoading(false)
-    }
+      if (res.ok) { const { payslips: data } = await res.json() as { payslips: Payslip[] }; setPayslips(data); setPayslipsLoaded(true) }
+    } finally { setPayslipsLoading(false) }
   }
 
   async function loadWarnings() {
-    if (warningsLoaded) return
-    setWarningsLoading(true)
+    if (warningsLoaded) return; setWarningsLoading(true)
     try {
       const res = await fetch('/api/employees/warnings')
-      if (res.ok) {
-        const { warnings: data } = await res.json()
-        setWarnings(data || [])
-        setWarningsLoaded(true)
-      }
+      if (res.ok) { const { warnings: data } = await res.json(); setWarnings(data || []); setWarningsLoaded(true) }
     } finally { setWarningsLoading(false) }
   }
 
   async function loadRegularizations() {
-    if (regsLoaded) return
-    setRegsLoading(true)
+    if (regsLoaded) return; setRegsLoading(true)
     try {
       const res = await fetch('/api/employees/regularization')
-      if (res.ok) {
-        const { regularizations: data } = await res.json()
-        setRegularizations(data || [])
-        setRegsLoaded(true)
-      }
+      if (res.ok) { const { regularizations: data } = await res.json(); setRegularizations(data || []); setRegsLoaded(true) }
     } finally { setRegsLoading(false) }
   }
 
   async function loadExpenses() {
-    if (expensesLoaded) return
-    setExpensesLoading(true)
+    if (expensesLoaded) return; setExpensesLoading(true)
     try {
       const res = await fetch('/api/employees/expenses')
-      if (res.ok) {
-        const { expenses: data } = await res.json()
-        setExpenses(data || [])
-        setExpensesLoaded(true)
-      }
-    } finally {
-      setExpensesLoading(false)
-    }
+      if (res.ok) { const { expenses: data } = await res.json(); setExpenses(data || []); setExpensesLoaded(true) }
+    } finally { setExpensesLoading(false) }
   }
 
   async function loadLoans() {
-    if (loansLoaded) return
-    setLoansLoading(true)
+    if (loansLoaded) return; setLoansLoading(true)
     try {
       const res = await fetch('/api/employees/loans')
-      if (res.ok) {
-        const { loans: data } = await res.json()
-        setLoans(data || [])
-        setLoansLoaded(true)
-      }
-    } finally {
-      setLoansLoading(false)
-    }
+      if (res.ok) { const { loans: data } = await res.json(); setLoans(data || []); setLoansLoaded(true) }
+    } finally { setLoansLoading(false) }
   }
 
   async function loadReviews() {
-    if (reviewsLoaded) return
-    setReviewsLoading(true)
+    if (reviewsLoaded) return; setReviewsLoading(true)
     try {
       const res = await fetch('/api/employees/performance-reviews')
-      if (res.ok) {
-        const { reviews: data } = await res.json()
-        setReviews(data || [])
-        setReviewsLoaded(true)
-      }
+      if (res.ok) { const { reviews: data } = await res.json(); setReviews(data || []); setReviewsLoaded(true) }
     } finally { setReviewsLoading(false) }
   }
 
+  // Lazy-load trigger on tab switch
+  function handleTabChange(id: TabId) {
+    setActive(id)
+    if (id === 'payslips')   loadPayslips()
+    if (id === 'loans')      loadLoans()
+    if (id === 'expenses')   loadExpenses()
+    if (id === 'warnings')   loadWarnings()
+    if (id === 'regularize') loadRegularizations()
+    if (id === 'reviews')    loadReviews()
+  }
+
+  const counts: Partial<Record<TabId, number>> = {
+    leaves:   leaveRequests.length,
+    advances: advances.length,
+    tickets:  tickets.length,
+    bonuses:  bonusHistory.length,
+  }
+
+  const activeLabel = ALL_TABS.find(t => t.id === active)?.label ?? ''
+
   return (
     <Card className="bg-zinc-900 border-zinc-800">
-      <CardContent className="pt-4">
-        <Tabs defaultValue="leaves">
-          <TabsList className="bg-zinc-800 border border-zinc-700 mb-4 flex-wrap h-auto gap-1 p-1">
-            <TabsTrigger value="leaves" className="text-xs data-[state=active]:bg-zinc-700 data-[state=active]:text-white">
-              Leaves {leaveRequests.length > 0 && <span className="ml-1 text-[10px] text-zinc-400">({leaveRequests.length})</span>}
-            </TabsTrigger>
-            <TabsTrigger value="advances" className="text-xs data-[state=active]:bg-zinc-700 data-[state=active]:text-white">
-              Advances {advances.length > 0 && <span className="ml-1 text-[10px] text-zinc-400">({advances.length})</span>}
-            </TabsTrigger>
-            <TabsTrigger value="salary" className="text-xs data-[state=active]:bg-zinc-700 data-[state=active]:text-white">
-              Salary History
-            </TabsTrigger>
-            <TabsTrigger value="bonuses" className="text-xs data-[state=active]:bg-zinc-700 data-[state=active]:text-white">
-              Bonuses {bonusHistory.length > 0 && <span className="ml-1 text-[10px] text-zinc-400">({bonusHistory.length})</span>}
-            </TabsTrigger>
-            <TabsTrigger value="tickets" className="text-xs data-[state=active]:bg-zinc-700 data-[state=active]:text-white">
-              Tickets {tickets.length > 0 && <span className="ml-1 text-[10px] text-zinc-400">({tickets.length})</span>}
-            </TabsTrigger>
-            <TabsTrigger value="payslips" className="text-xs data-[state=active]:bg-zinc-700 data-[state=active]:text-white"
-              onClick={loadPayslips}>
-              Payslips
-            </TabsTrigger>
-            <TabsTrigger value="loans" className="text-xs data-[state=active]:bg-zinc-700 data-[state=active]:text-white"
-              onClick={loadLoans}>
-              Loans
-            </TabsTrigger>
-            <TabsTrigger value="expenses" className="text-xs data-[state=active]:bg-zinc-700 data-[state=active]:text-white"
-              onClick={loadExpenses}>
-              Expenses
-            </TabsTrigger>
-            <TabsTrigger value="warnings" className="text-xs data-[state=active]:bg-zinc-700 data-[state=active]:text-white"
-              onClick={loadWarnings}>
-              Warnings
-            </TabsTrigger>
-            <TabsTrigger value="regularize" className="text-xs data-[state=active]:bg-zinc-700 data-[state=active]:text-white"
-              onClick={loadRegularizations}>
-              Regularizations
-            </TabsTrigger>
-            <TabsTrigger value="reviews" className="text-xs data-[state=active]:bg-zinc-700 data-[state=active]:text-white"
-              onClick={loadReviews}>
-              Reviews
-            </TabsTrigger>
-          </TabsList>
+      <CardContent className="p-0">
+        <div className="flex min-h-[300px]">
 
-          {/* Leaves */}
-          <TabsContent value="leaves">
-            {leaveRequests.length === 0 ? (
-              <EmptyState text="No leave requests yet" />
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+          {/* ── Desktop sidebar ── */}
+          <div className="hidden sm:flex border-r border-zinc-800 py-3 pl-2">
+            <EmployeeSidebar active={active} setActive={handleTabChange} counts={counts} />
+          </div>
+
+          {/* ── Mobile sidebar drawer ── */}
+          {mobileNav && (
+            <div className="fixed inset-0 z-30 flex sm:hidden">
+              <div className="absolute inset-0 bg-black/60" onClick={() => setMobileNav(false)} />
+              <div className="relative z-40 bg-zinc-900 border-r border-zinc-800 flex flex-col">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800">
+                  <span className="text-xs font-semibold text-zinc-300">History</span>
+                  <button onClick={() => setMobileNav(false)} className="p-1 text-zinc-400 hover:text-white">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <EmployeeSidebar active={active} setActive={handleTabChange} counts={counts} onClose={() => setMobileNav(false)} />
+              </div>
+            </div>
+          )}
+
+          {/* ── Content ── */}
+          <div className="flex-1 min-w-0 p-4">
+            {/* Mobile header */}
+            <div className="flex items-center gap-2 mb-3 sm:hidden">
+              <button onClick={() => setMobileNav(true)} className="p-1.5 bg-zinc-800 rounded-lg text-zinc-400 hover:text-white">
+                <Menu className="w-4 h-4" />
+              </button>
+              <span className="text-sm font-medium text-zinc-200">{activeLabel}</span>
+            </div>
+
+            {/* ── Leaves ── */}
+            {active === 'leaves' && (
+              leaveRequests.length === 0 ? <EmptyState text="No leave requests yet" /> :
+              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
                 {leaveRequests.map(lr => (
                   <div key={lr.id} className="flex items-center justify-between bg-zinc-800 rounded-md px-3 py-2.5">
                     <div>
@@ -318,41 +382,43 @@ export function HistoryTabs({ leaveRequests, advances, tickets, salaryHistory, b
                 ))}
               </div>
             )}
-          </TabsContent>
 
-          {/* Advances */}
-          <TabsContent value="advances">
-            {advances.length === 0 ? (
-              <EmptyState text="No advance requests yet" />
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                {advances.map(adv => (
-                  <div key={adv.id} className="flex items-center justify-between bg-zinc-800 rounded-md px-3 py-2.5">
-                    <div>
-                      <p className="text-sm text-zinc-200 font-medium">
-                        ₹{Number(adv.amount).toLocaleString('en-IN')}
-                        {adv.approved_amount && adv.approved_amount !== adv.amount && (
-                          <span className="text-zinc-400 text-xs ml-1">
-                            (approved ₹{Number(adv.approved_amount).toLocaleString('en-IN')})
+            {/* ── Regularizations ── */}
+            {active === 'regularize' && (
+              regsLoading ? <EmptyState text="Loading requests…" /> :
+              regularizations.length === 0 ? <EmptyState text="No regularization requests yet" /> :
+              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                {regularizations.map(reg => {
+                  const CLS: Record<string, string> = {
+                    pending:  'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+                    approved: 'bg-green-500/10 text-green-400 border-green-500/20',
+                    rejected: 'bg-red-500/10 text-red-400 border-red-500/20',
+                  }
+                  return (
+                    <div key={reg.id} className="flex items-start justify-between bg-zinc-800 rounded-md px-3 py-2.5 gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-zinc-200 text-sm font-medium">{fmt(reg.date)}</span>
+                          <span className="text-blue-400 text-[10px]">→ {reg.requested_status}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${CLS[reg.status] || ''}`}>
+                            {reg.status}
                           </span>
+                        </div>
+                        <p className="text-zinc-500 text-xs mt-0.5 truncate">{reg.reason}</p>
+                        {reg.manager_note && (
+                          <p className="text-zinc-600 text-[10px] mt-0.5 italic">{reg.manager_note}</p>
                         )}
-                      </p>
-                      <p className="text-xs text-zinc-500 mt-0.5">{adv.reason}</p>
-                      <p className="text-[10px] text-zinc-600 mt-0.5">{fmt(adv.created_at)}</p>
+                      </div>
                     </div>
-                    {statusBadge(adv.status)}
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
-          </TabsContent>
 
-          {/* Salary History */}
-          <TabsContent value="salary">
-            {salaryHistory.length === 0 ? (
-              <EmptyState text="No salary changes on record" />
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+            {/* ── Salary History ── */}
+            {active === 'salary' && (
+              salaryHistory.length === 0 ? <EmptyState text="No salary changes on record" /> :
+              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
                 {salaryHistory.map(sh => (
                   <div key={sh.id} className="flex items-center justify-between bg-zinc-800 rounded-md px-3 py-2.5">
                     <div>
@@ -370,14 +436,11 @@ export function HistoryTabs({ leaveRequests, advances, tickets, salaryHistory, b
                 ))}
               </div>
             )}
-          </TabsContent>
 
-          {/* Bonuses */}
-          <TabsContent value="bonuses">
-            {bonusHistory.length === 0 ? (
-              <EmptyState text="No bonuses on record" />
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+            {/* ── Bonuses ── */}
+            {active === 'bonuses' && (
+              bonusHistory.length === 0 ? <EmptyState text="No bonuses on record" /> :
+              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
                 {bonusHistory.map(b => (
                   <div key={b.id} className="flex items-center justify-between bg-zinc-800 rounded-md px-3 py-2.5">
                     <div>
@@ -391,42 +454,12 @@ export function HistoryTabs({ leaveRequests, advances, tickets, salaryHistory, b
                 ))}
               </div>
             )}
-          </TabsContent>
 
-          {/* Tickets */}
-          <TabsContent value="tickets">
-            {tickets.length === 0 ? (
-              <EmptyState text="No support tickets yet" />
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                {tickets.map(t => (
-                  <div key={t.id} className="bg-zinc-800 rounded-md px-3 py-2.5">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-zinc-200 font-medium">{t.subject}</p>
-                      {statusBadge(t.status)}
-                    </div>
-                    <p className="text-xs text-zinc-500 mt-1 line-clamp-2">{t.message}</p>
-                    {t.manager_reply && (
-                      <div className="mt-1.5 pl-2 border-l-2 border-blue-500/40">
-                        <p className="text-xs text-blue-400">Reply: {t.manager_reply}</p>
-                      </div>
-                    )}
-                    <p className="text-[10px] text-zinc-600 mt-1">{fmt(t.created_at)}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-          {/* Payslips */}
-          <TabsContent value="payslips">
-            {payslipsLoading ? (
-              <EmptyState text="Loading payslips…" />
-            ) : !payslipsLoaded ? (
-              <EmptyState text="Click the Payslips tab to load" />
-            ) : payslips.length === 0 ? (
-              <EmptyState text="No paid payslips yet" />
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+            {/* ── Payslips ── */}
+            {active === 'payslips' && (
+              payslipsLoading ? <EmptyState text="Loading payslips…" /> :
+              payslips.length === 0 ? <EmptyState text="No paid payslips yet" /> :
+              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
                 {payslips.map(p => {
                   const d = new Date(p.month)
                   const label = `${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`
@@ -454,90 +487,88 @@ export function HistoryTabs({ leaveRequests, advances, tickets, salaryHistory, b
                 })}
               </div>
             )}
-          </TabsContent>
-          {/* Warnings */}
-          <TabsContent value="warnings">
-            {warningsLoading ? (
-              <EmptyState text="Loading warnings…" />
-            ) : !warningsLoaded ? (
-              <EmptyState text="Click the Warnings tab to load" />
-            ) : warnings.length === 0 ? (
-              <EmptyState text="No warning letters on record" />
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                {warnings.map(w => {
-                  const TYPE_CLS: Record<string, string> = {
-                    verbal:  'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-                    written: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
-                    final:   'bg-red-500/10 text-red-400 border-red-500/20',
-                  }
-                  return (
-                    <div key={w.id} className="bg-zinc-800 rounded-md px-3 py-2.5 space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${TYPE_CLS[w.warning_type] || ''}`}>
-                          {w.warning_type}
-                        </span>
-                        <span className="text-zinc-200 text-sm font-medium">{w.subject}</span>
-                      </div>
-                      <p className="text-zinc-500 text-xs line-clamp-2">{w.description}</p>
-                      <p className="text-[10px] text-zinc-600">{fmt(w.issued_on)}</p>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </TabsContent>
 
-          {/* Regularizations */}
-          <TabsContent value="regularize">
-            {regsLoading ? (
-              <EmptyState text="Loading requests…" />
-            ) : !regsLoaded ? (
-              <EmptyState text="Click the Regularizations tab to load" />
-            ) : regularizations.length === 0 ? (
-              <EmptyState text="No regularization requests yet" />
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                {regularizations.map(reg => {
-                  const REG_STATUS_CLS: Record<string, string> = {
-                    pending:  'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-                    approved: 'bg-green-500/10 text-green-400 border-green-500/20',
-                    rejected: 'bg-red-500/10 text-red-400 border-red-500/20',
-                  }
-                  return (
-                    <div key={reg.id} className="flex items-start justify-between bg-zinc-800 rounded-md px-3 py-2.5 gap-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-zinc-200 text-sm font-medium">{fmt(reg.date)}</span>
-                          <span className="text-blue-400 text-[10px]">→ {reg.requested_status}</span>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${REG_STATUS_CLS[reg.status] || ''}`}>
-                            {reg.status}
+            {/* ── Advances ── */}
+            {active === 'advances' && (
+              advances.length === 0 ? <EmptyState text="No advance requests yet" /> :
+              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                {advances.map(adv => (
+                  <div key={adv.id} className="flex items-center justify-between bg-zinc-800 rounded-md px-3 py-2.5">
+                    <div>
+                      <p className="text-sm text-zinc-200 font-medium">
+                        ₹{Number(adv.amount).toLocaleString('en-IN')}
+                        {adv.approved_amount && adv.approved_amount !== adv.amount && (
+                          <span className="text-zinc-400 text-xs ml-1">
+                            (approved ₹{Number(adv.approved_amount).toLocaleString('en-IN')})
                           </span>
-                        </div>
-                        <p className="text-zinc-500 text-xs mt-0.5 truncate">{reg.reason}</p>
-                        {reg.manager_note && (
-                          <p className="text-zinc-600 text-[10px] mt-0.5 italic">{reg.manager_note}</p>
                         )}
+                      </p>
+                      <p className="text-xs text-zinc-500 mt-0.5">{adv.reason}</p>
+                      <p className="text-[10px] text-zinc-600 mt-0.5">{fmt(adv.created_at)}</p>
+                    </div>
+                    {statusBadge(adv.status)}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* ── Loans ── */}
+            {active === 'loans' && (
+              loansLoading ? <EmptyState text="Loading loans…" /> :
+              loans.length === 0 ? <EmptyState text="No loans on record" /> :
+              <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                {loans.map(loan => {
+                  const balance = Math.max(0, loan.amount - loan.emi_amount * loan.months_paid)
+                  const pct = loan.months_total > 0 ? Math.round((loan.months_paid / loan.months_total) * 100) : 0
+                  const CLS: Record<string, string> = {
+                    active:    'bg-green-500/10 text-green-400 border-green-500/20',
+                    cleared:   'bg-blue-500/10 text-blue-400 border-blue-500/20',
+                    cancelled: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20',
+                  }
+                  return (
+                    <div key={loan.id} className="bg-zinc-800 rounded-md px-3 py-2.5 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm text-zinc-200 font-medium">
+                            ₹{Math.round(loan.amount).toLocaleString('en-IN')}
+                            <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${CLS[loan.status] || ''}`}>
+                              {loan.status}
+                            </span>
+                          </p>
+                          <p className="text-xs text-zinc-500 mt-0.5">{loan.reason}</p>
+                          <p className="text-[10px] text-zinc-600 mt-0.5">
+                            Disbursed {fmt(loan.disbursed_on)} · EMI ₹{Math.round(loan.emi_amount).toLocaleString('en-IN')}/mo
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-xs text-zinc-400">{loan.months_paid}/{loan.months_total} paid</p>
+                          {loan.status === 'active' && (
+                            <p className="text-xs text-zinc-300 font-medium">Bal ₹{Math.round(balance).toLocaleString('en-IN')}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="h-1.5 bg-zinc-700 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${loan.status === 'cleared' ? 'bg-blue-500' : 'bg-green-500'}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <p className="text-[10px] text-zinc-600 mt-0.5 text-right">{pct}% repaid</p>
                       </div>
                     </div>
                   )
                 })}
               </div>
             )}
-          </TabsContent>
 
-          {/* Expenses */}
-          <TabsContent value="expenses">
-            {expensesLoading ? (
-              <EmptyState text="Loading expenses…" />
-            ) : !expensesLoaded ? (
-              <EmptyState text="Click the Expenses tab to load" />
-            ) : expenses.length === 0 ? (
-              <EmptyState text="No expense requests yet" />
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+            {/* ── Expenses ── */}
+            {active === 'expenses' && (
+              expensesLoading ? <EmptyState text="Loading expenses…" /> :
+              expenses.length === 0 ? <EmptyState text="No expense requests yet" /> :
+              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
                 {expenses.map(exp => {
-                  const STATUS_CLS: Record<string, string> = {
+                  const CLS: Record<string, string> = {
                     pending:  'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
                     approved: 'bg-green-500/10 text-green-400 border-green-500/20',
                     rejected: 'bg-red-500/10 text-red-400 border-red-500/20',
@@ -548,7 +579,7 @@ export function HistoryTabs({ leaveRequests, advances, tickets, salaryHistory, b
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span>{EXPENSE_ICON[exp.category] || '📎'}</span>
                           <span className="text-zinc-200 text-sm font-medium">{exp.category}</span>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${STATUS_CLS[exp.status] || ''}`}>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${CLS[exp.status] || ''}`}>
                             {exp.status}
                           </span>
                         </div>
@@ -571,18 +602,61 @@ export function HistoryTabs({ leaveRequests, advances, tickets, salaryHistory, b
                 })}
               </div>
             )}
-          </TabsContent>
 
-          {/* Performance Reviews */}
-          <TabsContent value="reviews">
-            {reviewsLoading ? (
-              <EmptyState text="Loading reviews…" />
-            ) : !reviewsLoaded ? (
-              <EmptyState text="Click the Reviews tab to load" />
-            ) : reviews.length === 0 ? (
-              <EmptyState text="No published reviews yet" />
-            ) : (
-              <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+            {/* ── Tickets ── */}
+            {active === 'tickets' && (
+              tickets.length === 0 ? <EmptyState text="No support tickets yet" /> :
+              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                {tickets.map(t => (
+                  <div key={t.id} className="bg-zinc-800 rounded-md px-3 py-2.5">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-zinc-200 font-medium">{t.subject}</p>
+                      {statusBadge(t.status)}
+                    </div>
+                    <p className="text-xs text-zinc-500 mt-1 line-clamp-2">{t.message}</p>
+                    {t.manager_reply && (
+                      <div className="mt-1.5 pl-2 border-l-2 border-blue-500/40">
+                        <p className="text-xs text-blue-400">Reply: {t.manager_reply}</p>
+                      </div>
+                    )}
+                    <p className="text-[10px] text-zinc-600 mt-1">{fmt(t.created_at)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* ── Warnings ── */}
+            {active === 'warnings' && (
+              warningsLoading ? <EmptyState text="Loading warnings…" /> :
+              warnings.length === 0 ? <EmptyState text="No warning letters on record" /> :
+              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                {warnings.map(w => {
+                  const CLS: Record<string, string> = {
+                    verbal:  'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+                    written: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
+                    final:   'bg-red-500/10 text-red-400 border-red-500/20',
+                  }
+                  return (
+                    <div key={w.id} className="bg-zinc-800 rounded-md px-3 py-2.5 space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${CLS[w.warning_type] || ''}`}>
+                          {w.warning_type}
+                        </span>
+                        <span className="text-zinc-200 text-sm font-medium">{w.subject}</span>
+                      </div>
+                      <p className="text-zinc-500 text-xs line-clamp-2">{w.description}</p>
+                      <p className="text-[10px] text-zinc-600">{fmt(w.issued_on)}</p>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* ── Performance Reviews ── */}
+            {active === 'reviews' && (
+              reviewsLoading ? <EmptyState text="Loading reviews…" /> :
+              reviews.length === 0 ? <EmptyState text="No published reviews yet" /> :
+              <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
                 {reviews.map(rv => {
                   const stars = (val: number | null) =>
                     val ? `${'★'.repeat(Math.round(val))}${'☆'.repeat(5 - Math.round(val))} ${val.toFixed(1)}` : null
@@ -591,45 +665,24 @@ export function HistoryTabs({ leaveRequests, advances, tickets, salaryHistory, b
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <div>
                           <p className="text-sm font-medium text-zinc-200">{rv.review_period}</p>
-                          <p className="text-[10px] text-zinc-500">
-                            {fmt(rv.period_start)} – {fmt(rv.period_end)}
-                          </p>
+                          <p className="text-[10px] text-zinc-500">{fmt(rv.period_start)} – {fmt(rv.period_end)}</p>
                         </div>
                         {rv.overall_rating && (
-                          <span className="text-yellow-400 text-sm font-medium">
-                            {stars(rv.overall_rating)}
-                          </span>
+                          <span className="text-yellow-400 text-sm font-medium">{stars(rv.overall_rating)}</span>
                         )}
                       </div>
                       {(rv.performance_rating || rv.attendance_rating || rv.behavior_rating) && (
                         <div className="flex flex-wrap gap-2 text-[10px] text-zinc-500">
                           {rv.performance_rating && <span>Perf: <span className="text-yellow-400">{rv.performance_rating.toFixed(1)}</span></span>}
-                          {rv.attendance_rating && <span>Att: <span className="text-yellow-400">{rv.attendance_rating.toFixed(1)}</span></span>}
-                          {rv.behavior_rating && <span>Beh: <span className="text-yellow-400">{rv.behavior_rating.toFixed(1)}</span></span>}
+                          {rv.attendance_rating  && <span>Att: <span className="text-yellow-400">{rv.attendance_rating.toFixed(1)}</span></span>}
+                          {rv.behavior_rating    && <span>Beh: <span className="text-yellow-400">{rv.behavior_rating.toFixed(1)}</span></span>}
                         </div>
                       )}
-                      {rv.strengths && (
-                        <div>
-                          <p className="text-[10px] text-zinc-500 mb-0.5">Strengths</p>
-                          <p className="text-xs text-zinc-300">{rv.strengths}</p>
-                        </div>
-                      )}
-                      {rv.improvements && (
-                        <div>
-                          <p className="text-[10px] text-zinc-500 mb-0.5">Areas to Improve</p>
-                          <p className="text-xs text-zinc-300">{rv.improvements}</p>
-                        </div>
-                      )}
-                      {rv.goals && (
-                        <div>
-                          <p className="text-[10px] text-zinc-500 mb-0.5">Goals</p>
-                          <p className="text-xs text-zinc-300">{rv.goals}</p>
-                        </div>
-                      )}
-                      {rv.comments && (
-                        <p className="text-xs text-zinc-400 italic">&quot;{rv.comments}&quot;</p>
-                      )}
-                      {rv.reviewer && (
+                      {rv.strengths    && <div><p className="text-[10px] text-zinc-500 mb-0.5">Strengths</p><p className="text-xs text-zinc-300">{rv.strengths}</p></div>}
+                      {rv.improvements && <div><p className="text-[10px] text-zinc-500 mb-0.5">Areas to Improve</p><p className="text-xs text-zinc-300">{rv.improvements}</p></div>}
+                      {rv.goals        && <div><p className="text-[10px] text-zinc-500 mb-0.5">Goals</p><p className="text-xs text-zinc-300">{rv.goals}</p></div>}
+                      {rv.comments     && <p className="text-xs text-zinc-400 italic">&quot;{rv.comments}&quot;</p>}
+                      {rv.reviewer     && (
                         <p className="text-[10px] text-zinc-600">
                           Reviewed by {rv.reviewer.first_name} {rv.reviewer.last_name} · {fmt(rv.created_at)}
                         </p>
@@ -639,66 +692,8 @@ export function HistoryTabs({ leaveRequests, advances, tickets, salaryHistory, b
                 })}
               </div>
             )}
-          </TabsContent>
-
-          {/* Loans */}
-          <TabsContent value="loans">
-            {loansLoading ? (
-              <EmptyState text="Loading loans…" />
-            ) : !loansLoaded ? (
-              <EmptyState text="Click the Loans tab to load" />
-            ) : loans.length === 0 ? (
-              <EmptyState text="No loans on record" />
-            ) : (
-              <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
-                {loans.map(loan => {
-                  const balance = Math.max(0, loan.amount - loan.emi_amount * loan.months_paid)
-                  const pct = loan.months_total > 0 ? Math.round((loan.months_paid / loan.months_total) * 100) : 0
-                  const STATUS_CLS: Record<string, string> = {
-                    active:    'bg-green-500/10 text-green-400 border-green-500/20',
-                    cleared:   'bg-blue-500/10 text-blue-400 border-blue-500/20',
-                    cancelled: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20',
-                  }
-                  return (
-                    <div key={loan.id} className="bg-zinc-800 rounded-md px-3 py-2.5 space-y-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="text-sm text-zinc-200 font-medium">
-                            ₹{Math.round(loan.amount).toLocaleString('en-IN')}
-                            <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${STATUS_CLS[loan.status] || ''}`}>
-                              {loan.status}
-                            </span>
-                          </p>
-                          <p className="text-xs text-zinc-500 mt-0.5">{loan.reason}</p>
-                          <p className="text-[10px] text-zinc-600 mt-0.5">
-                            Disbursed {fmt(loan.disbursed_on)} · EMI ₹{Math.round(loan.emi_amount).toLocaleString('en-IN')}/mo
-                          </p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-xs text-zinc-400">{loan.months_paid}/{loan.months_total} paid</p>
-                          {loan.status === 'active' && (
-                            <p className="text-xs text-zinc-300 font-medium">
-                              Bal ₹{Math.round(balance).toLocaleString('en-IN')}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="h-1.5 bg-zinc-700 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all ${loan.status === 'cleared' ? 'bg-blue-500' : 'bg-green-500'}`}
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                        <p className="text-[10px] text-zinc-600 mt-0.5 text-right">{pct}% repaid</p>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+          </div>
+        </div>
       </CardContent>
     </Card>
   )
