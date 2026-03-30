@@ -5,7 +5,7 @@ import {
   Users, CalendarCheck, Banknote, Ticket, Clock, Megaphone, Settings, Wallet,
   UserCog, BarChart2, CreditCard, HandCoins, Building2, Receipt, AlertTriangle,
   Upload, Activity, Star, CalendarDays, LogOut, Cpu,
-  ChevronDown, ChevronRight, Menu, X, LucideIcon,
+  ChevronDown, ChevronRight, Menu, X, LucideIcon, ArrowRight,
 } from 'lucide-react'
 import { EmployeeApprovals }    from './EmployeeApprovals'
 import { LeaveManagement }      from './LeaveManagement'
@@ -28,6 +28,8 @@ import { PerformanceReviews }   from './PerformanceReviews'
 import { LeaveBalancesPanel }   from './LeaveBalancesPanel'
 import { ResignationManagement } from './ResignationManagement'
 import { HikvisionPanel }       from './HikvisionPanel'
+import { CelebrationsWidget }   from './CelebrationsWidget'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -67,6 +69,13 @@ type Permissions = {
   can_manage_shifts: boolean; can_send_broadcast: boolean
 } | null
 
+type CelebrationAlert = {
+  type: 'birthday' | 'anniversary'
+  employee_id: string; first_name: string; last_name: string
+  employee_code: string | null; profile_photo: string | null
+  days_away: number; years?: number
+}
+
 interface Props {
   role: string
   permissions: Permissions
@@ -79,6 +88,9 @@ interface Props {
   recentBroadcasts: BroadcastData[]
   companySettings: CompanySetting[]
   managers: ManagerData[]
+  celebrationsToday?: CelebrationAlert[]
+  celebrationsUpcoming?: CelebrationAlert[]
+  trialBanner?: { daysLeft: number; urgent: boolean } | null
 }
 
 // ── Tab + group config ────────────────────────────────────────────────────────
@@ -266,6 +278,7 @@ export function AdminTabs({
   role, permissions,
   pendingEmployees, pendingLeaves, pendingAdvances, recentApprovedAdvances,
   openTickets, shifts, recentBroadcasts, companySettings, managers,
+  celebrationsToday = [], celebrationsUpcoming = [], trialBanner,
 }: Props) {
   const isMaster = role === 'master_admin'
 
@@ -284,6 +297,13 @@ export function AdminTabs({
     tickets:   openTickets.length,
   }
 
+  const stats = [
+    { label: 'Pending Registrations', value: pendingEmployees.length,  Icon: Users,         color: 'text-yellow-400', bg: 'bg-yellow-500/10' },
+    { label: 'Pending Leaves',        value: pendingLeaves.length,     Icon: CalendarCheck, color: 'text-blue-400',   bg: 'bg-blue-500/10'   },
+    { label: 'Pending Advances',      value: pendingAdvances.length,   Icon: Banknote,      color: 'text-purple-400', bg: 'bg-purple-500/10' },
+    { label: 'Open Tickets',          value: openTickets.length,       Icon: Ticket,        color: 'text-red-400',    bg: 'bg-red-500/10'    },
+  ]
+
   const [active,       setActive]       = useState<TabId>(visibleTabs[0]?.id ?? 'tickets')
   const [collapsed,    setCollapsed]    = useState(false)
   const [mobileOpen,   setMobileOpen]   = useState(false)
@@ -291,43 +311,44 @@ export function AdminTabs({
   const activeLabel = TAB_CONFIG.find(t => t.id === active)?.label ?? ''
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-      <div className="flex min-h-[600px] relative">
+    <div className="flex flex-1 min-h-0">
 
-        {/* ── Mobile overlay ── */}
-        {mobileOpen && (
-          <div className="fixed inset-0 z-30 flex md:hidden">
-            <div className="absolute inset-0 bg-black/60" onClick={() => setMobileOpen(false)} />
-            <div className="relative z-40 flex flex-col h-full">
-              <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800 bg-zinc-950">
-                <span className="text-xs font-semibold text-zinc-300">Navigation</span>
-                <button onClick={() => setMobileOpen(false)} className="p-1 text-zinc-400 hover:text-white">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <SidebarNav
-                visibleTabs={visibleTabs} counts={counts}
-                active={active} setActive={setActive}
-                collapsed={false} setCollapsed={() => {}}
-                mobile onClose={() => setMobileOpen(false)}
-              />
+      {/* ── Mobile overlay ── */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-30 flex md:hidden">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setMobileOpen(false)} />
+          <div className="relative z-40 flex flex-col h-full">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800 bg-zinc-950">
+              <span className="text-xs font-semibold text-zinc-300">Navigation</span>
+              <button onClick={() => setMobileOpen(false)} className="p-1 text-zinc-400 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
             </div>
+            <SidebarNav
+              visibleTabs={visibleTabs} counts={counts}
+              active={active} setActive={setActive}
+              collapsed={false} setCollapsed={() => {}}
+              mobile onClose={() => setMobileOpen(false)}
+            />
           </div>
-        )}
-
-        {/* ── Desktop sidebar ── */}
-        <div className="hidden md:flex shrink-0">
-          <SidebarNav
-            visibleTabs={visibleTabs} counts={counts}
-            active={active} setActive={setActive}
-            collapsed={collapsed} setCollapsed={setCollapsed}
-          />
         </div>
+      )}
 
-        {/* ── Content ── */}
-        <div className="flex-1 min-w-0 p-4">
-          {/* Mobile header inside box */}
-          <div className="flex items-center gap-2 mb-3 md:hidden">
+      {/* ── Desktop sidebar ── */}
+      <div className="hidden md:flex shrink-0 h-full overflow-y-auto">
+        <SidebarNav
+          visibleTabs={visibleTabs} counts={counts}
+          active={active} setActive={setActive}
+          collapsed={collapsed} setCollapsed={setCollapsed}
+        />
+      </div>
+
+      {/* ── Content ── */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+
+          {/* Mobile header */}
+          <div className="flex items-center gap-2 md:hidden">
             <button
               onClick={() => setMobileOpen(true)}
               className="p-1.5 bg-zinc-800 rounded-lg text-zinc-400 hover:text-white"
@@ -337,29 +358,86 @@ export function AdminTabs({
             <span className="text-sm font-medium text-zinc-200">{activeLabel}</span>
           </div>
 
-        {active === 'approvals'    && <EmployeeApprovals pendingEmployees={pendingEmployees} shifts={shifts} />}
-        {active === 'employees'    && <EmployeeManagement />}
-        {active === 'leaves'       && <LeaveManagement pendingLeaves={pendingLeaves} />}
-        {active === 'advances'     && <AdvanceManagement pendingAdvances={pendingAdvances} recentApprovedAdvances={recentApprovedAdvances} />}
-        {active === 'tickets'      && <TicketManagement openTickets={openTickets} />}
-        {active === 'shifts'       && <ShiftManagement shifts={shifts} />}
-        {active === 'broadcasts'   && <BroadcastPanel shifts={shifts} recentBroadcasts={recentBroadcasts} />}
-        {active === 'loans'        && <LoanManagement />}
-        {active === 'expenses'     && <ExpenseManagement />}
-        {active === 'departments'  && <DepartmentsPanel />}
-        {active === 'warnings'     && <WarningLetters />}
-        {active === 'resignations' && <ResignationManagement />}
-        {active === 'import'       && <BulkImportPanel onClose={() => {}} />}
-        {active === 'leave_balances' && <LeaveBalancesPanel />}
-        {active === 'performance'  && <PerformanceReviews />}
-        {active === 'activity_log' && <ActivityLogViewer />}
-        {active === 'hikvision'    && <HikvisionPanel />}
-        {active === 'payroll'      && <PayrollRun />}
-        {active === 'reports'      && <Reports />}
-        {active === 'settings'     && <PolicySettings companySettings={companySettings} managers={managers} />}
-        {active === 'billing'      && <BillingPanel />}
-        </div>{/* end content */}
-      </div>{/* end flex row */}
-    </div> /* end card box */
+          {/* Trial banner */}
+          {trialBanner && (
+            <div className={`flex items-center justify-between gap-3 rounded-lg px-4 py-3 border text-sm ${
+              trialBanner.urgent
+                ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                : 'bg-zinc-800 border-zinc-700 text-zinc-300'
+            }`}>
+              <div className="flex items-center gap-2">
+                <Clock className={`w-4 h-4 shrink-0 ${trialBanner.urgent ? 'text-amber-400' : 'text-zinc-400'}`} />
+                <span>
+                  {trialBanner.urgent
+                    ? `Trial expires in ${trialBanner.daysLeft} day${trialBanner.daysLeft === 1 ? '' : 's'} — upgrade to keep access.`
+                    : `Free trial · ${trialBanner.daysLeft} days remaining.`}
+                </span>
+              </div>
+              <a
+                href="mailto:support@hrjo.in?subject=Plan%20Upgrade%20Request"
+                className={`flex items-center gap-1 text-xs font-medium whitespace-nowrap hover:underline ${
+                  trialBanner.urgent ? 'text-amber-400' : 'text-violet-400'
+                }`}
+              >
+                Upgrade now <ArrowRight className="w-3 h-3" />
+              </a>
+            </div>
+          )}
+
+          {/* Title */}
+          <div>
+            <h1 className="text-xl font-bold text-white">Admin Dashboard</h1>
+            <p className="text-zinc-400 text-xs mt-0.5">Manage employees, leaves, advances, and settings</p>
+          </div>
+
+          {/* Stats grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {stats.map(s => (
+              <Card key={s.label} className="bg-zinc-900 border-zinc-800">
+                <CardHeader className="pb-1 pt-4 px-4">
+                  <CardTitle className="text-xs text-zinc-400 font-medium flex items-center gap-1.5">
+                    <div className={`${s.bg} rounded p-1`}>
+                      <s.Icon className={`w-3 h-3 ${s.color}`} />
+                    </div>
+                    {s.label}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-4">
+                  <p className={`text-3xl font-bold ${s.value > 0 ? s.color : 'text-zinc-500'}`}>{s.value}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Celebrations */}
+          <CelebrationsWidget today={celebrationsToday} upcoming={celebrationsUpcoming} />
+
+          {/* Active tab content */}
+          {active === 'approvals'    && <EmployeeApprovals pendingEmployees={pendingEmployees} shifts={shifts} />}
+          {active === 'employees'    && <EmployeeManagement />}
+          {active === 'leaves'       && <LeaveManagement pendingLeaves={pendingLeaves} />}
+          {active === 'advances'     && <AdvanceManagement pendingAdvances={pendingAdvances} recentApprovedAdvances={recentApprovedAdvances} />}
+          {active === 'tickets'      && <TicketManagement openTickets={openTickets} />}
+          {active === 'shifts'       && <ShiftManagement shifts={shifts} />}
+          {active === 'broadcasts'   && <BroadcastPanel shifts={shifts} recentBroadcasts={recentBroadcasts} />}
+          {active === 'loans'        && <LoanManagement />}
+          {active === 'expenses'     && <ExpenseManagement />}
+          {active === 'departments'  && <DepartmentsPanel />}
+          {active === 'warnings'     && <WarningLetters />}
+          {active === 'resignations' && <ResignationManagement />}
+          {active === 'import'       && <BulkImportPanel onClose={() => {}} />}
+          {active === 'leave_balances' && <LeaveBalancesPanel />}
+          {active === 'performance'  && <PerformanceReviews />}
+          {active === 'activity_log' && <ActivityLogViewer />}
+          {active === 'hikvision'    && <HikvisionPanel />}
+          {active === 'payroll'      && <PayrollRun />}
+          {active === 'reports'      && <Reports />}
+          {active === 'settings'     && <PolicySettings companySettings={companySettings} managers={managers} />}
+          {active === 'billing'      && <BillingPanel />}
+
+        </div>
+      </div>
+
+    </div>
   )
 }
