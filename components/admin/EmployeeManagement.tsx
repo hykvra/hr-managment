@@ -458,7 +458,7 @@ export function EmployeeManagement() {
                   <div className="space-y-1.5">
                     <Label className="text-xs text-zinc-400">Current Salary</Label>
                     <p className="text-zinc-300 text-sm font-medium">
-                      ₹{Number(selected.base_salary).toLocaleString('en-IN')}
+                      ₹{Number(selected?.base_salary).toLocaleString('en-IN')}
                     </p>
                   </div>
                   <div className="space-y-1.5">
@@ -509,7 +509,7 @@ export function EmployeeManagement() {
                 <>
                   <div className="space-y-1.5">
                     <Label className="text-xs text-zinc-400">Current Shift</Label>
-                    <p className="text-zinc-300 text-sm">{shiftName(selected.shift_id)}</p>
+                    <p className="text-zinc-300 text-sm">{shiftName(selected?.shift_id)}</p>
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs text-zinc-400">New Shift</Label>
