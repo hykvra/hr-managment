@@ -33,8 +33,9 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Look up which tenant/device this event belongs to ─────────────────────
-    // Match by device IP
-    const { data: device } = await supabaseAdmin
+    // Try exact IP match first; fall back to any active push-enabled device
+    // (device sends from public/NAT IP which differs from stored LAN IP)
+    let { data: device } = await supabaseAdmin
       .from('hikvision_devices')
       .select('id, tenant_id, is_active, push_enabled')
       .eq('ip_address', ip)
@@ -43,8 +44,20 @@ export async function POST(req: NextRequest) {
       .maybeSingle()
 
     if (!device) {
-      // Unknown device or push disabled — still 200 so device stops retrying
-      console.warn(`[hik-push] Unrecognised device IP: ${ip}`)
+      // IP didn't match (device is behind NAT — public IP differs from LAN IP)
+      // Fall back to first active push-enabled device
+      const { data: fallback } = await supabaseAdmin
+        .from('hikvision_devices')
+        .select('id, tenant_id, is_active, push_enabled')
+        .eq('is_active', true)
+        .eq('push_enabled', true)
+        .limit(1)
+        .maybeSingle()
+      device = fallback
+    }
+
+    if (!device) {
+      console.warn(`[hik-push] No active push-enabled device found (source IP: ${ip})`)
       return new NextResponse(null, { status: 200 })
     }
 
