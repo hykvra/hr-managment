@@ -168,6 +168,20 @@ async function handlePullEvents(
     .eq('device_id', device.id)
   const empMap = Object.fromEntries((mappings ?? []).map(m => [m.hik_employee_no, m.employee_id]))
 
+  // Pre-fetch existing event keys to avoid duplicates
+  const { data: existingRows } = await supabase
+    .from('hikvision_events')
+    .select('hik_employee_no, event_time')
+    .eq('device_id', device.id)
+    .gte('event_time', startTime.toISOString())
+    .lte('event_time', endTime.toISOString())
+
+  const existingKeys = new Set(
+    (existingRows ?? []).map(r =>
+      `${r.hik_employee_no}|${new Date(r.event_time).toISOString()}`
+    )
+  )
+
   let imported = 0
   let skipped  = 0
 
@@ -175,6 +189,9 @@ async function handlePullEvents(
     if (!ev.employeeNo) { skipped++; continue }
 
     const eventTime  = new Date(ev.time)
+    const key        = `${ev.employeeNo}|${eventTime.toISOString()}`
+    if (existingKeys.has(key)) { skipped++; continue }
+
     const dateStr    = eventTime.toISOString().split('T')[0]
     const employeeId = empMap[ev.employeeNo] ?? null
 
@@ -192,6 +209,7 @@ async function handlePullEvents(
     })
 
     if (evErr?.code === '23505') { skipped++; continue }
+    existingKeys.add(key)
 
     if (employeeId) {
       const hrStatus = hikStatusToHRStatus(ev.attendanceStatus, eventTime)

@@ -140,14 +140,34 @@ async function main() {
 
     console.log(`   Saving to Supabase cloud...`)
 
+    // Pre-fetch all existing event keys for this device in the time range
+    // to avoid duplicate inserts without relying on a DB constraint
+    const { data: existingRows } = await supabase
+      .from('hikvision_events')
+      .select('hik_employee_no, event_time')
+      .eq('device_id', device.id)
+      .gte('event_time', startTime.toISOString())
+      .lte('event_time', endTime.toISOString())
+
+    const existingKeys = new Set(
+      (existingRows ?? []).map(r =>
+        `${r.hik_employee_no}|${new Date(r.event_time).toISOString()}`
+      )
+    )
+    console.log(`   Already in DB: ${existingKeys.size} events`)
+
     for (const ev of allEvents) {
       if (!ev.employeeNo) { skipped++; continue }
 
       const eventTime  = new Date(ev.time)
+      const key        = `${ev.employeeNo}|${eventTime.toISOString()}`
+
+      // Skip if already in DB
+      if (existingKeys.has(key)) { skipped++; continue }
+
       const dateStr    = eventTime.toISOString().split('T')[0]
       const employeeId = empMap[ev.employeeNo] ?? null
 
-      // Insert event — skip if already exists (duplicate)
       const { error: evErr } = await supabase.from('hikvision_events').insert({
         tenant_id:         tenant.id,
         device_id:         device.id,
@@ -161,9 +181,10 @@ async function main() {
         processed:         employeeId !== null,
       })
 
-      if (evErr?.code === '23505') { skipped++; continue } // already imported
+      if (evErr?.code === '23505') { skipped++; continue } // DB-level duplicate fallback
       if (evErr) { skipped++; continue }
 
+      existingKeys.add(key) // prevent same-run duplicates
       imported++
 
       // Update attendance record
