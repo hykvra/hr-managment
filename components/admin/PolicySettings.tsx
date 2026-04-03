@@ -50,6 +50,7 @@ export function PolicySettings({ companySettings, managers }: Props) {
     max_leaves_per_day: getSetting('max_leaves_per_day'),
     advance_max_percent: getSetting('advance_max_percent'),
     penalty_multiplier: getSetting('penalty_multiplier'),
+    timezone: getSetting('timezone') || 'Asia/Kolkata',
   })
   const [savingSettings, setSavingSettings] = useState(false)
   const [settingsMsg, setSettingsMsg] = useState('')
@@ -259,6 +260,31 @@ export function PolicySettings({ companySettings, managers }: Props) {
             <Input type="number" step="0.5" value={settings.penalty_multiplier}
               onChange={e => setSettings(s => ({ ...s, penalty_multiplier: e.target.value }))}
               className={inputCls} />
+          </div>
+          <Separator className="bg-zinc-700" />
+          {/* Timezone */}
+          <div className="space-y-3 pt-2">
+            <h3 className="text-white text-sm font-semibold">Date &amp; Time</h3>
+            <div className="space-y-1.5">
+              <label className="text-xs text-zinc-400">Timezone</label>
+              <select
+                value={settings.timezone || 'Asia/Kolkata'}
+                onChange={e => setSettings(s => ({ ...s, timezone: e.target.value }))}
+                className="w-full h-8 bg-zinc-800 border border-zinc-700 text-white text-xs rounded-md px-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="Asia/Kolkata">Asia/Kolkata — IST (UTC+5:30)</option>
+                <option value="Asia/Dubai">Asia/Dubai — GST (UTC+4:00)</option>
+                <option value="Asia/Karachi">Asia/Karachi — PKT (UTC+5:00)</option>
+                <option value="Asia/Dhaka">Asia/Dhaka — BST (UTC+6:00)</option>
+                <option value="Asia/Singapore">Asia/Singapore — SGT (UTC+8:00)</option>
+                <option value="Asia/Bangkok">Asia/Bangkok — ICT (UTC+7:00)</option>
+                <option value="Europe/London">Europe/London — GMT/BST (UTC+0/+1)</option>
+                <option value="America/New_York">America/New_York — EST/EDT (UTC-5/-4)</option>
+                <option value="America/Los_Angeles">America/Los_Angeles — PST/PDT (UTC-8/-7)</option>
+                <option value="UTC">UTC (UTC+0)</option>
+              </select>
+              <p className="text-zinc-600 text-[10px]">Used for attendance time calculations and reports</p>
+            </div>
           </div>
           <div className="flex items-center gap-3 pt-1">
             <Button size="sm" disabled={savingSettings} onClick={saveSettings} className="text-xs">

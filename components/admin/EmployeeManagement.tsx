@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, TrendingUp, Gift, RefreshCw, UserX, ChevronDown, X, Settings, FolderOpen, ExternalLink } from 'lucide-react'
+import { Search, TrendingUp, Gift, RefreshCw, UserX, ChevronDown, X, Settings, FolderOpen, ExternalLink, UserPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -36,7 +36,7 @@ type Employee = {
 type Shift = { id: string; name: string }
 type Department = { id: string; name: string }
 
-type ModalType = 'salary' | 'bonus' | 'shift' | 'deactivate' | 'edit_details' | null
+type ModalType = 'salary' | 'bonus' | 'shift' | 'deactivate' | 'edit_details' | 'add_employee' | null
 
 type DocItem = {
   id: string
@@ -106,6 +106,21 @@ export function EmployeeManagement() {
   const [bonusReason, setBonusReason] = useState('')
   const [newShiftId, setNewShiftId] = useState('')
 
+  // Add employee form
+  const [newFirst, setNewFirst] = useState('')
+  const [newLast, setNewLast] = useState('')
+  const [newEmail, setNewEmail] = useState('')
+  const [newMobile, setNewMobile] = useState('')
+  const [newAddress, setNewAddress] = useState('')
+  const [newDob, setNewDob] = useState('')
+  const [newGender, setNewGender] = useState('Male')
+  const [newJoining, setNewJoining] = useState(new Date().toISOString().slice(0, 10))
+  const [newSalaryAmt, setNewSalaryAmt] = useState('0')
+  const [newEmpCode, setNewEmpCode] = useState('')
+  const [newRole, setNewRole] = useState('employee')
+  const [newShift, setNewShift] = useState('')
+  const [newDept, setNewDept] = useState('')
+
   async function fetchEmployees() {
     setLoading(true)
     try {
@@ -167,6 +182,36 @@ export function EmployeeManagement() {
     setApiError('')
   }
 
+  async function submitNewEmployee() {
+    setSubmitting(true)
+    setApiError('')
+    try {
+      const res = await fetch('/api/admin/employees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          first_name: newFirst, last_name: newLast, email: newEmail,
+          mobile: newMobile, address: newAddress, dob: newDob,
+          gender: newGender, joining_date: newJoining,
+          base_salary: Number(newSalaryAmt), employee_code: newEmpCode,
+          role: newRole, shift_id: newShift || null, department: newDept || null,
+        }),
+      })
+      const json = await res.json() as { success?: boolean; error?: string }
+      if (!res.ok) { setApiError(json.error || 'Something went wrong'); return }
+      // Reset form
+      setNewFirst(''); setNewLast(''); setNewEmail(''); setNewMobile('')
+      setNewAddress(''); setNewDob(''); setNewGender('Male')
+      setNewJoining(new Date().toISOString().slice(0, 10))
+      setNewSalaryAmt('0'); setNewEmpCode(''); setNewRole('employee')
+      setNewShift(''); setNewDept('')
+      setModal(null)
+      await fetchEmployees()
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   async function submit(action: string, body: Record<string, unknown>) {
     if (!selected) return
     setSubmitting(true)
@@ -216,6 +261,11 @@ export function EmployeeManagement() {
             ))}
           </SelectContent>
         </Select>
+        <Button size="sm"
+          className="h-8 text-xs bg-blue-600 hover:bg-blue-700 gap-1.5"
+          onClick={() => { setModal('add_employee'); setApiError('') }}>
+          <UserPlus className="w-3.5 h-3.5" /> Add Employee
+        </Button>
         <span className="text-zinc-500 text-xs ml-auto">{filtered.length} employee{filtered.length !== 1 ? 's' : ''}</span>
       </div>
 
@@ -373,7 +423,7 @@ export function EmployeeManagement() {
       </div>
 
       {/* ── Modals ── */}
-      {modal && selected && (
+      {modal && (modal === 'add_employee' || selected) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl w-full max-w-sm">
             {/* Header */}
@@ -383,9 +433,12 @@ export function EmployeeManagement() {
                   {modal === 'salary' ? 'Update Salary' :
                    modal === 'bonus' ? 'Add Bonus' :
                    modal === 'shift' ? 'Change Shift' :
-                   modal === 'edit_details' ? 'Edit Details' : 'Deactivate Employee'}
+                   modal === 'edit_details' ? 'Edit Details' :
+                   modal === 'add_employee' ? 'Add New Employee' : 'Deactivate Employee'}
                 </p>
-                <p className="text-zinc-500 text-xs mt-0.5">{selected.first_name} {selected.last_name}</p>
+                <p className="text-zinc-500 text-xs mt-0.5">
+                  {modal === 'add_employee' ? 'Fill in the details below' : `${selected?.first_name} ${selected?.last_name}`}
+                </p>
               </div>
               <button onClick={closeModal} className="text-zinc-400 hover:text-zinc-200">
                 <X className="w-4 h-4" />
@@ -532,7 +585,7 @@ export function EmployeeManagement() {
                   <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
                     <p className="text-red-400 text-xs font-medium">Are you sure?</p>
                     <p className="text-zinc-400 text-xs mt-1">
-                      {selected.first_name} {selected.last_name} will lose access to the portal immediately.
+                      {selected?.first_name} {selected?.last_name} will lose access to the portal immediately.
                       This can be reversed by reactivating from the employee list.
                     </p>
                   </div>
@@ -546,6 +599,109 @@ export function EmployeeManagement() {
                     Cancel
                   </Button>
                 </>
+              )}
+
+              {/* Add employee modal */}
+              {modal === 'add_employee' && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-zinc-400">First Name *</Label>
+                      <Input value={newFirst} onChange={e => setNewFirst(e.target.value)} placeholder="Aman"
+                        className="h-8 text-xs bg-zinc-800 border-zinc-700 text-white" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-zinc-400">Last Name *</Label>
+                      <Input value={newLast} onChange={e => setNewLast(e.target.value)} placeholder="Khan"
+                        className="h-8 text-xs bg-zinc-800 border-zinc-700 text-white" />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-zinc-400">Email *</Label>
+                    <Input value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="aman@example.com" type="email"
+                      className="h-8 text-xs bg-zinc-800 border-zinc-700 text-white" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-zinc-400">Mobile *</Label>
+                      <Input value={newMobile} onChange={e => setNewMobile(e.target.value)} placeholder="9876543210"
+                        className="h-8 text-xs bg-zinc-800 border-zinc-700 text-white" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-zinc-400">Employee Code</Label>
+                      <Input value={newEmpCode} onChange={e => setNewEmpCode(e.target.value)} placeholder="e.g. 7"
+                        className="h-8 text-xs bg-zinc-800 border-zinc-700 text-white" />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-zinc-400">Address *</Label>
+                    <Input value={newAddress} onChange={e => setNewAddress(e.target.value)} placeholder="Street, City"
+                      className="h-8 text-xs bg-zinc-800 border-zinc-700 text-white" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-zinc-400">Date of Birth *</Label>
+                      <Input value={newDob} onChange={e => setNewDob(e.target.value)} type="date"
+                        className="h-8 text-xs bg-zinc-800 border-zinc-700 text-white" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-zinc-400">Gender *</Label>
+                      <select value={newGender} onChange={e => setNewGender(e.target.value)}
+                        className="w-full h-8 bg-zinc-800 border border-zinc-700 text-white text-xs rounded-md px-2">
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-zinc-400">Joining Date *</Label>
+                      <Input value={newJoining} onChange={e => setNewJoining(e.target.value)} type="date"
+                        className="h-8 text-xs bg-zinc-800 border-zinc-700 text-white" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-zinc-400">Base Salary (₹)</Label>
+                      <Input value={newSalaryAmt} onChange={e => setNewSalaryAmt(e.target.value)} type="number" placeholder="0"
+                        className="h-8 text-xs bg-zinc-800 border-zinc-700 text-white" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-zinc-400">Role</Label>
+                      <select value={newRole} onChange={e => setNewRole(e.target.value)}
+                        className="w-full h-8 bg-zinc-800 border border-zinc-700 text-white text-xs rounded-md px-2">
+                        <option value="employee">Employee</option>
+                        <option value="manager">Manager</option>
+                        <option value="attendance">Attendance</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-zinc-400">Shift</Label>
+                      <select value={newShift} onChange={e => setNewShift(e.target.value)}
+                        className="w-full h-8 bg-zinc-800 border border-zinc-700 text-white text-xs rounded-md px-2">
+                        <option value="">No shift</option>
+                        {shifts.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  {departments.length > 0 && (
+                    <div className="space-y-1">
+                      <Label className="text-xs text-zinc-400">Department</Label>
+                      <select value={newDept} onChange={e => setNewDept(e.target.value)}
+                        className="w-full h-8 bg-zinc-800 border border-zinc-700 text-white text-xs rounded-md px-2">
+                        <option value="">No department</option>
+                        {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  <p className="text-zinc-600 text-[10px]">Default password: Esam@1234 (employee changes on first login)</p>
+                  <Button className="w-full h-8 text-xs bg-blue-600 hover:bg-blue-700"
+                    disabled={submitting || !newFirst || !newLast || !newEmail || !newMobile || !newAddress || !newDob || !newJoining}
+                    onClick={submitNewEmployee}>
+                    {submitting ? 'Creating…' : 'Create Employee'}
+                  </Button>
+                </div>
               )}
             </div>
           </div>

@@ -24,6 +24,7 @@ export async function PATCH(req: Request) {
     'brand_name',
     'brand_color',
     'brand_initials',
+    'timezone',
   ]
 
   for (const [key, value] of Object.entries(settings)) {
