@@ -12,7 +12,8 @@
     "hik-pull": "tsx --env-file=.env.local scripts/hik-pull.ts",
     "hik-proxy": "tsx --env-file=.env.local scripts/hik-proxy.ts",
     "hik-list": "tsx --env-file=.env.local scripts/hik-list.ts",
-    "hik-remap": "tsx --env-file=.env.local scripts/hik-remap.ts"
+    "hik-remap": "tsx --env-file=.env.local scripts/hik-remap.ts",
+    "set-employee-codes": "tsx --env-file=.env.local scripts/set-employee-codes.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1019.0",
