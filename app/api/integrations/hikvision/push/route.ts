@@ -30,8 +30,8 @@ export async function POST(req: NextRequest) {
 
     const event = parseXmlEvent(xml)
     if (!event || !event.employeeNo) {
-      // Heartbeat / non-attendance event — acknowledge silently
-      console.log(`[hik-push] Heartbeat/non-attendance event from ${ip}`)
+      // Log first 500 chars of unrecognised XML to diagnose format
+      console.log(`[hik-push] Unrecognised event from ${ip}: ${xml.slice(0, 500)}`)
       return new NextResponse(null, { status: 200 })
     }
 
