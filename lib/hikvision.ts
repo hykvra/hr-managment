@@ -195,14 +195,16 @@ export async function hikDeleteUser(dev: HikDevice, employeeNo: string): Promise
 /** Configure the device to push events to our server */
 export async function hikConfigurePush(dev: HikDevice, pushUrl: string): Promise<void> {
   const urlObj = new URL(pushUrl)
+  const isHttps = urlObj.protocol === 'https:'
+  const defaultPort = isHttps ? 443 : 80
   const body = `<?xml version="1.0" encoding="UTF-8"?>
 <HttpHostNotification>
   <id>1</id>
-  <url>${pushUrl}</url>
-  <protocolType>HTTP</protocolType>
+  <url>${urlObj.pathname}</url>
+  <protocolType>${isHttps ? 'HTTPS' : 'HTTP'}</protocolType>
   <addressingFormatType>ipaddress</addressingFormatType>
   <ipAddress>${urlObj.hostname}</ipAddress>
-  <portNo>${urlObj.port || 80}</portNo>
+  <portNo>${urlObj.port || defaultPort}</portNo>
   <parameterFormatType>XML</parameterFormatType>
   <httpAuthenticationMethod>none</httpAuthenticationMethod>
 </HttpHostNotification>`

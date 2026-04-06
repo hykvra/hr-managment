@@ -21,6 +21,8 @@ export async function POST(req: NextRequest) {
              ?? req.headers.get('x-real-ip')
              ?? ''
 
+    console.log(`[hik-push] Received push from IP: ${ip}, body length: ${rawBody.length}`)
+
     // ── Extract XML from multipart body ──────────────────────────────────────
     // Device sends multipart/mixed with XML as first part. Extract XML block.
     const xmlMatch = rawBody.match(/<\?xml[\s\S]*?<\/EventNotificationAlert>/)
@@ -29,8 +31,11 @@ export async function POST(req: NextRequest) {
     const event = parseXmlEvent(xml)
     if (!event || !event.employeeNo) {
       // Heartbeat / non-attendance event — acknowledge silently
+      console.log(`[hik-push] Heartbeat/non-attendance event from ${ip}`)
       return new NextResponse(null, { status: 200 })
     }
+
+    console.log(`[hik-push] Event: employee=${event.employeeNo} (${event.employeeName}), time=${event.time}, status=${event.attendanceStatus}`)
 
     // ── Look up which tenant/device this event belongs to ─────────────────────
     // Try exact IP match first; fall back to any active push-enabled device
@@ -74,21 +79,30 @@ export async function POST(req: NextRequest) {
 
     const employeeId = mapping?.employee_id ?? null
 
-    // ── Store event ───────────────────────────────────────────────────────────
+    // ── Store event (upsert to handle duplicates) ─────────────────────────────
     const eventTime = new Date(event.time)
 
-    await supabaseAdmin.from('hikvision_events').insert({
-      tenant_id:        tenantId,
-      device_id:        deviceId,
-      hik_employee_no:  event.employeeNo,
-      employee_id:      employeeId,
-      event_time:       eventTime.toISOString(),
-      attendance_status: event.attendanceStatus,
-      verify_mode:      event.verifyMode,
-      card_no:          event.cardNo || null,
-      employee_name:    event.employeeName || null,
-      processed:        false,
-    })
+    const { error: insertError } = await supabaseAdmin
+      .from('hikvision_events')
+      .upsert({
+        tenant_id:        tenantId,
+        device_id:        deviceId,
+        hik_employee_no:  event.employeeNo,
+        employee_id:      employeeId,
+        event_time:       eventTime.toISOString(),
+        attendance_status: event.attendanceStatus,
+        verify_mode:      event.verifyMode,
+        card_no:          event.cardNo || null,
+        employee_name:    event.employeeName || null,
+        processed:        false,
+      }, {
+        onConflict: 'device_id,hik_employee_no,event_time',
+        ignoreDuplicates: true,
+      })
+
+    if (insertError) {
+      console.error(`[hik-push] Insert error:`, insertError)
+    }
 
     // ── Update attendance record ──────────────────────────────────────────────
     if (employeeId) {
@@ -96,7 +110,6 @@ export async function POST(req: NextRequest) {
       const dateStr = eventTime.toISOString().split('T')[0]
 
       if (hrStatus) {
-        // Upsert: if already Present, keep it; else set new status
         const { data: existing } = await supabaseAdmin
           .from('attendance')
           .select('status')
@@ -112,7 +125,6 @@ export async function POST(req: NextRequest) {
             status:      hrStatus,
           })
         } else if (existing.status === 'Absent' || existing.status === 'Uninformed') {
-          // Upgrade to Present/HalfDay
           await supabaseAdmin.from('attendance')
             .update({ status: hrStatus })
             .eq('employee_id', employeeId)
@@ -121,14 +133,26 @@ export async function POST(req: NextRequest) {
       }
 
       // Mark event as processed + update device last_event_at
+      await supabaseAdmin.from('hikvision_events')
+        .update({ processed: true })
+        .eq('device_id', deviceId)
+        .eq('hik_employee_no', event.employeeNo)
+        .eq('event_time', eventTime.toISOString())
+
       await supabaseAdmin.from('hikvision_devices')
         .update({ last_event_at: eventTime.toISOString() })
         .eq('id', deviceId)
     }
 
+    console.log(`[hik-push] Stored event for employee ${event.employeeNo} at ${event.time}`)
     return new NextResponse(null, { status: 200 })
   } catch (err) {
     console.error('[hik-push] error:', err)
     return new NextResponse(null, { status: 200 }) // always 200 to prevent device retry loops
   }
+}
+
+// GET endpoint to verify the push URL is reachable
+export async function GET() {
+  return NextResponse.json({ status: 'ok', endpoint: 'hikvision-push', timestamp: new Date().toISOString() })
 }
