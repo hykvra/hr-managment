@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     const event = parseXmlEvent(xml)
     if (!event || !event.employeeNo) {
       // Log first 500 chars of unrecognised XML to diagnose format
-      console.log(`[hik-push] Unrecognised event from ${ip}: ${xml.slice(0, 500)}`)
+      console.log(`[hik-push] RAW BODY from ${ip}: ${rawBody.slice(0, 1500)}`)
       return new NextResponse(null, { status: 200 })
     }
 
