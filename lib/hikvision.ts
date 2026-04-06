@@ -288,11 +288,13 @@ export interface HikUserRaw {
  */
 export function parsePushEvent(rawBody: string): HikEvent | null {
   // ── Try JSON (multipart form-data with JSON part) ─────────────────────────
-  // Extract the JSON block between the first { and last }
-  const jsonMatch = rawBody.match(/\{[\s\S]*\}/)
-  if (jsonMatch) {
+  // Device sends multipart body; extract only the JSON part (before Picture part)
+  // Find JSON content after "Content-Type: application/json" header block
+  const jsonPartMatch = rawBody.match(/Content-Type:\s*application\/json[\s\S]*?\r?\n\r?\n(\{[\s\S]*?\})\s*\r?\n--/)
+  const jsonStr = jsonPartMatch?.[1] ?? (rawBody.trim().startsWith('{') ? rawBody : null)
+  if (jsonStr) {
     try {
-      const json = JSON.parse(jsonMatch[0]) as {
+      const json = JSON.parse(jsonStr) as {
         eventType?: string
         dateTime?: string
         AccessControllerEvent?: {
@@ -316,7 +318,8 @@ export function parsePushEvent(rawBody: string): HikEvent | null {
           time:             json.dateTime ?? new Date().toISOString(),
         }
       }
-    } catch {
+    } catch (e) {
+      console.error('[hik-push] JSON parse error:', e)
       // JSON parse failed — fall through to XML
     }
   }
