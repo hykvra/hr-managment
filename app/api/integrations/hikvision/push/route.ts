@@ -79,12 +79,12 @@ export async function POST(req: NextRequest) {
 
     const employeeId = mapping?.employee_id ?? null
 
-    // ── Store event (upsert to handle duplicates) ─────────────────────────────
+    // ── Store event ─────────────────────────────────────────────────────────────
     const eventTime = new Date(event.time)
 
     const { error: insertError } = await supabaseAdmin
       .from('hikvision_events')
-      .upsert({
+      .insert({
         tenant_id:        tenantId,
         device_id:        deviceId,
         hik_employee_no:  event.employeeNo,
@@ -95,13 +95,13 @@ export async function POST(req: NextRequest) {
         card_no:          event.cardNo || null,
         employee_name:    event.employeeName || null,
         processed:        false,
-      }, {
-        onConflict: 'device_id,hik_employee_no,event_time',
-        ignoreDuplicates: true,
       })
 
     if (insertError) {
-      console.error(`[hik-push] Insert error:`, insertError)
+      // 23505 = duplicate — expected and safe to ignore
+      if (insertError.code !== '23505') {
+        console.error(`[hik-push] Insert error:`, insertError)
+      }
     }
 
     // ── Update attendance record ──────────────────────────────────────────────
