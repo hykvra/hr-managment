@@ -77,6 +77,11 @@ export async function POST(req: NextRequest) {
     // ── Store event ─────────────────────────────────────────────────────────────
     const eventTime = new Date(event.time)
 
+    // Ignore events before Jan 1, 2026
+    if (eventTime < new Date('2026-01-01T00:00:00Z')) {
+      return new NextResponse(null, { status: 200 })
+    }
+
     const { error: insertError } = await supabaseAdmin
       .from('hikvision_events')
       .insert({
