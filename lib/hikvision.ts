@@ -98,35 +98,59 @@ export async function hikTestConnection(dev: HikDevice): Promise<string> {
   return `${model} · FW ${firmware} · S/N ${serial}`
 }
 
-/** Pull attendance events between two ISO timestamps */
+/** Pull attendance events between two ISO timestamps (with pagination) */
 export async function hikPullEvents(
   dev: HikDevice,
   startTime: string,
   endTime: string,
-  maxResults = 100,
+  pageSize = 100,
 ): Promise<HikEvent[]> {
-  const body = JSON.stringify({
-    AcsEventCond: {
-      searchID: Date.now().toString(),
-      searchResultPosition: 0,
-      maxResults,
-      major: 0,
-      minor: 0,
-      startTime,
-      endTime,
-      picEnable: false,
-    },
-  })
+  const allEvents: HikEvent[] = []
+  let position = 0
+  const searchID = Date.now().toString()
 
-  const res = await hikFetch(dev, '/ISAPI/AccessControl/AcsEvent?format=json', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body,
-  })
-  if (!res.ok) throw new Error(`Pull events HTTP ${res.status}`)
+  while (true) {
+    const body = JSON.stringify({
+      AcsEventCond: {
+        searchID,
+        searchResultPosition: position,
+        maxResults: pageSize,
+        major: 0,
+        minor: 0,
+        startTime,
+        endTime,
+        picEnable: false,
+      },
+    })
 
-  const json = await res.json() as { AcsEvent?: { InfoList?: HikEventRaw[] } }
-  return (json.AcsEvent?.InfoList ?? []).map(normaliseEvent)
+    const res = await hikFetch(dev, '/ISAPI/AccessControl/AcsEvent?format=json', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    })
+    if (!res.ok) throw new Error(`Pull events HTTP ${res.status}`)
+
+    const json = await res.json() as {
+      AcsEvent?: {
+        totalMatches?: number
+        InfoList?: HikEventRaw[]
+        responseStatusStrg?: string
+      }
+    }
+
+    const page = (json.AcsEvent?.InfoList ?? []).map(normaliseEvent)
+    allEvents.push(...page)
+
+    const total = json.AcsEvent?.totalMatches ?? 0
+    const status = json.AcsEvent?.responseStatusStrg ?? ''
+
+    // Stop if: no more results, reached total, or device says "OK" (no more pages)
+    if (page.length === 0 || allEvents.length >= total || status === 'OK') break
+
+    position += page.length
+  }
+
+  return allEvents
 }
 
 /** Push an employee record to the device */
