@@ -279,7 +279,51 @@ export interface HikUserRaw {
   userType?: string
 }
 
-// ── XML push event parser (for incoming device push requests) ─────────────────
+// ── Push event parsers (for incoming device push requests) ───────────────────
+
+/**
+ * Parse multipart/form-data or raw JSON push payload from device.
+ * Device sends: multipart body with a JSON part named "AccessControllerEvent".
+ * Falls back to XML parsing for older firmware.
+ */
+export function parsePushEvent(rawBody: string): HikEvent | null {
+  // ── Try JSON (multipart form-data with JSON part) ─────────────────────────
+  // Extract the JSON block between the first { and last }
+  const jsonMatch = rawBody.match(/\{[\s\S]*\}/)
+  if (jsonMatch) {
+    try {
+      const json = JSON.parse(jsonMatch[0]) as {
+        eventType?: string
+        dateTime?: string
+        AccessControllerEvent?: {
+          employeeNoString?: string
+          name?: string
+          cardNo?: string
+          attendanceStatus?: string
+          currentVerifyMode?: string
+          verifyMode?: string
+        }
+      }
+
+      if (json.eventType === 'AccessControllerEvent' && json.AccessControllerEvent) {
+        const ace = json.AccessControllerEvent
+        return {
+          employeeNo:       ace.employeeNoString ?? '',
+          employeeName:     ace.name ?? '',
+          cardNo:           ace.cardNo ?? '',
+          attendanceStatus: ace.attendanceStatus ?? '',
+          verifyMode:       ace.currentVerifyMode ?? ace.verifyMode ?? '',
+          time:             json.dateTime ?? new Date().toISOString(),
+        }
+      }
+    } catch {
+      // JSON parse failed — fall through to XML
+    }
+  }
+
+  // ── Fall back to XML ──────────────────────────────────────────────────────
+  return parseXmlEvent(rawBody)
+}
 
 /** Parse a raw XML push payload from the device into a HikEvent */
 export function parseXmlEvent(xml: string): HikEvent | null {

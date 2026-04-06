@@ -12,7 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { parseXmlEvent, hikStatusToHRStatus } from '@/lib/hikvision'
+import { parsePushEvent, hikStatusToHRStatus } from '@/lib/hikvision'
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,15 +23,10 @@ export async function POST(req: NextRequest) {
 
     console.log(`[hik-push] Received push from IP: ${ip}, body length: ${rawBody.length}`)
 
-    // ── Extract XML from multipart body ──────────────────────────────────────
-    // Device sends multipart/mixed with XML as first part. Extract XML block.
-    const xmlMatch = rawBody.match(/<\?xml[\s\S]*?<\/EventNotificationAlert>/)
-    const xml = xmlMatch?.[0] ?? rawBody
-
-    const event = parseXmlEvent(xml)
+    // ── Parse event (JSON multipart or XML) ──────────────────────────────────
+    const event = parsePushEvent(rawBody)
     if (!event || !event.employeeNo) {
-      // Log first 500 chars of unrecognised XML to diagnose format
-      console.log(`[hik-push] RAW BODY from ${ip}: ${rawBody.slice(0, 1500)}`)
+      // Heartbeat / non-attendance event — acknowledge silently
       return new NextResponse(null, { status: 200 })
     }
 
