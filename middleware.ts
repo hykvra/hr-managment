@@ -72,7 +72,7 @@ export async function middleware(req: NextRequest) {
   }
 
   // Public API routes — no auth required
-  if (pathname.startsWith('/api/public/')) {
+  if (pathname.startsWith('/api/public/') || pathname.startsWith('/api/integrations/')) {
     return NextResponse.next({ request: { headers: baseHeaders } })
   }
 
