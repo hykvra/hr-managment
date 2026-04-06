@@ -349,14 +349,19 @@ export function hikStatusToHRStatus(
   hikStatus: string,
   eventTime: Date,
 ): 'Present' | 'HalfDay' | null {
-  if (!hikStatus || hikStatus === 'undefined') return null
-
-  // checkOut / breakOut / overtimeOut don't trigger a new attendance record
+  // checkOut / breakOut / overtimeOut don't trigger attendance
   if (['checkOut', 'breakOut', 'overtimeOut'].includes(hikStatus)) return null
 
   // Check if event is after 13:00 local → half day
   const hour = eventTime.getHours()
+
   if (['checkIn', 'overtimeIn'].includes(hikStatus)) {
+    return hour >= 13 ? 'HalfDay' : 'Present'
+  }
+
+  // No status from device (access control mode, not attendance mode)
+  // Treat any face scan as check-in: before 13:00 = Present, after = HalfDay
+  if (!hikStatus || hikStatus === 'undefined' || hikStatus === '') {
     return hour >= 13 ? 'HalfDay' : 'Present'
   }
 
